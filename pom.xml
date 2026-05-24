@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- =========================================================== -->
+    <!-- Project Identity                                             -->
+    <!-- =========================================================== -->
+
+    <!--
+        groupId: your organisation's reverse domain name
+        This follows PathVisio's existing convention
+    -->
+    <groupId>org.pathvisio</groupId>
+
+    <!--
+        artifactId: the name of this specific plugin jar
+        Maven will produce: githubplugin-1.0.0-SNAPSHOT.jar
+    -->
+    <artifactId>githubplugin</artifactId>
+
+    <!--
+        SNAPSHOT means this is still in development
+        Remove -SNAPSHOT when you do a final release
+    -->
+    <version>1.0.0-SNAPSHOT</version>
+
+    <!-- jar = we are building a plugin, not a web app (war) -->
+    <packaging>jar</packaging>
+
+    <name>PathVisio GitHub Integration Plugin</name>
+    <description>
+        Direct GitHub integration plugin for PathVisio that enables
+        biologists to submit and update biological pathways to the
+        WikiPathways GitHub repository directly from PathVisio.
+    </description>
+
+    <!-- =========================================================== -->
+    <!-- Properties — centralised version numbers                     -->
+    <!-- Change a version here and it updates everywhere below        -->
+    <!-- =========================================================== -->
+    <properties>
+        <!-- Java version — PathVisio is built on Java 8 -->
+        <!-- Do NOT change to 11 or 17 — plugin must run inside PathVisio -->
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+
+        <!-- Ensures all source files are read as UTF-8 -->
+        <!-- Prevents build warnings on Windows about encoding -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Dependency versions — change once here to update everywhere -->
+        <junit.version>5.10.0</junit.version>
+        <maven.surefire.version>3.1.2</maven.surefire.version>
+        <maven.compiler.version>3.11.0</maven.compiler.version>
+        <maven.jar.version>3.3.0</maven.jar.version>
+    </properties>
+
+    <!-- =========================================================== -->
+    <!-- Dependencies — libraries your plugin needs                   -->
+    <!-- =========================================================== -->
+    <dependencies>
+
+        <!--
+            JUnit 5 — test framework
+            scope=test means this jar is ONLY on the classpath during
+            mvn test — it is NOT included in your final plugin jar
+            This is correct — you do not ship test code to users
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            NOTE: PathVisio core libraries are NOT declared here yet.
+            Your mentor will provide the correct Maven coordinates
+            or local jar references for:
+            - pathvisio-core
+            - libgpml
+            - org.pathvisio.desktop
+            Add them here when your mentor confirms the pom.xml setup.
+
+            Example of what they will look like:
+            <dependency>
+                <groupId>org.pathvisio</groupId>
+                <artifactId>pathvisio-core</artifactId>
+                <version>3.3.0</version>
+                <scope>provided</scope>
+            </dependency>
+
+            scope=provided means PathVisio core is already available
+            at runtime inside PathVisio itself — you do not bundle it
+            in your plugin jar. Only your plugin code goes in the jar.
+        -->
+
+    </dependencies>
+
+    <!-- =========================================================== -->
+    <!-- Build Configuration — how Maven compiles and packages        -->
+    <!-- =========================================================== -->
+    <build>
+        <plugins>
+
+            <!--
+                Maven Compiler Plugin
+                Enforces Java 8 source and target compatibility.
+                Without this Maven may use a different JDK version
+                and produce bytecode PathVisio cannot load.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.version}</version>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                    <encoding>UTF-8</encoding>
+                    <!--
+                        showWarnings: surfaces compilation warnings
+                        in Maven output — important to catch issues
+                        before your mentor reviews the code
+                    -->
+                    <showWarnings>true</showWarnings>
+                </configuration>
+            </plugin>
+
+            <!--
+                Maven Surefire Plugin
+                This is what actually runs your JUnit 5 tests when
+                you execute: mvn test
+                Without this plugin, Maven uses an older test runner
+                that does not understand JUnit 5 annotations and
+                your tests are silently skipped — they show as 0 tests run
+                with no failures, making you think everything passed
+                when nothing actually ran.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.version}</version>
+                <configuration>
+                    <!--
+                        useModulePath=false is required for Java 8
+                        Module path is a Java 9+ feature
+                        Without this line, Surefire may fail on Java 8
+                    -->
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
+
+            <!--
+                Maven JAR Plugin
+                Controls how your final plugin jar is assembled.
+                The manifest section tells PathVisio which class
+                is the entry point for your plugin.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven.jar.version}</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <!--
+                                This must point to your plugin entry class
+                                once GitHubPlugin.java is written.
+                                Update this when that class exists.
+                            -->
+                            <mainClass>org.pathvisio.githubplugin.GitHubPlugin</mainClass>
+                        </manifest>
+                        <manifestEntries>
+                            <!--
+                                Plugin metadata that PathVisio reads
+                                to display in its plugin manager
+                            -->
+                            <Plugin-Name>GitHub Integration Plugin</Plugin-Name>
+                            <Plugin-Version>1.0.0</Plugin-Version>
+                            <Plugin-Author>Snehashree Prusty</Plugin-Author>
+                            <Plugin-Description>Direct GitHub integration for WikiPathways pathway submission</Plugin-Description>
+                        </manifestEntries>
+                    </archive>
+                    <!--
+                        Output jar name without the version suffix
+                        Produces: githubplugin.jar
+                        PathVisio loads plugins by jar filename from
+                        its plugins/ directory
+                    -->
+                    <finalName>githubplugin</finalName>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>
