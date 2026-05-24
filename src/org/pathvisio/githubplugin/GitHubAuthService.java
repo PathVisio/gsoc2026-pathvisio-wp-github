@@ -518,12 +518,55 @@ private String pollForAccessToken() throws IOException
 	 */
 private SwingWorker<String, String> createPollingWorker(AuthCallback callback, int expiresIn)
 {
-    // method to build the polling worker but does NOT execute it, caller calls execute().
-    //  runs on EDT, UI access allowed.
-    // TODO: implement in next session
-    return null;
-}
+   return new SwingWorker<String, String>() {
+    @Override
+    protected String doInBackground() throws Exception {
 
+        long expiryTime = System.currentTimeMillis() + expiresIn * 1000L;
+        while (!isCancelled())
+        {
+            if (System.currentTimeMillis() > expiryTime)
+            {
+                throw new IOException("Code for authentication has expired. Please try again.");
+            }
+            String token = pollForAccessToken();
+            if (token != null) return token;
+            publish("Waiting for user authorization...");
+            Thread.sleep(interval*1000L);
+        }
+        return null;
+    }
+        @Override
+        protected void process(List<String> chunks){
+            String latestMessage = chunks.get(chunks.size()-1);
+            callback.onStatusUpdate(latestMessage);
+        }
+        @Override
+        protected void done() {
+            try {
+                String token = get();
+                if (token != null)
+                {
+                TokenManager.saveToken(token);
+                callback.onSuccess(token);
+                }
+                else
+                {
+                    callback.onFailure("Authentication cancelled.");
+                }
+            }
+            catch (ExecutionException e)
+            {
+               callback.onFailure("Authentication failed: " + e.getCause().getMessage()); 
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+                callback.onFailure("Authentication interrupted.");
+            }
+        }
+    };
+}
 	/**
 	 * Begins the device code OAuth flow after token validation is needed.
 	 * 
