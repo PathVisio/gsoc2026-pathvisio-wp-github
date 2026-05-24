@@ -16,19 +16,16 @@
  ******************************************************************************/
 package org.pathvisio.githubplugin;
 
-import java.awt.Desktop;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutionException;
 import javax.swing.SwingWorker;
-import java.io.IOException;
-import java.util.List;
 import org.pathvisio.githubplugin.util.TokenManager;
+
 /**
  * Service class for managing GitHub OAuth 2.0 Device Flow authentication.
  * 
@@ -87,52 +84,65 @@ import org.pathvisio.githubplugin.util.TokenManager;
  * @see TokenManager
  */
 public class GitHubAuthService {
-    /**
+	/**
 	 * GitHub OAuth application client ID.
 	 * 
 	 * Must be configured with a valid GitHub OAuth app client ID for authentication to work.
 	 * Obtain this value by registering an OAuth application at github.com/settings/applications/new
 	 */
-private static final String CLIENT_ID = "";
-    /**
+	private static final String CLIENT_ID = "";
+
+	/**
 	 * GitHub API endpoint for requesting device and user codes.
 	 * 
 	 * This is the first step in the device code OAuth flow.
 	 */
+	private static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
 
-private static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
-    /**
+	/**
 	 * GitHub API endpoint for polling and exchanging device code for access token.
 	 * 
 	 * This endpoint is used for polling authorization status during the authentication flow.
 	 */
-private static final String ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
-    /**
+	private static final String ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
+
+	/**
 	 * GitHub REST API version used in request headers.
 	 */
-private static final String GITHUB_API_VERSION = "2022-11-28";
-private static final int CONNECT_TIMEOUT_MS = 10_000;
-private static final int READ_TIMEOUT_MS = 10_000;
-    /**
+	private static final String GITHUB_API_VERSION = "2022-11-28";
+
+	/**
+	 * HTTP connection timeout in milliseconds.
+	 */
+	private static final int CONNECT_TIMEOUT_MS = 10_000;
+
+	/**
+	 * HTTP read timeout in milliseconds.
+	 */
+	private static final int READ_TIMEOUT_MS = 10_000;
+
+	/**
 	 * Device code obtained from GitHub during the authentication flow.
 	 * 
 	 * Used to poll for access token and must be kept confidential.
 	 */
-private String deviceCode;
-/**
+	private String deviceCode;
+
+	/**
 	 * Polling interval in seconds.
 	 * 
 	 * Adjusted dynamically if GitHub returns a "slow_down" error to respect rate limits.
 	 */
-private int interval;
-/**
+	private int interval;
+
+	/**
 	 * Background worker for polling GitHub's access token endpoint.
 	 * 
 	 * May be null if no polling is currently in progress.
 	 */
-private SwingWorker<String, String> pollingWorker;
+	private SwingWorker<String, String> pollingWorker;
 
-    // ================================================================================
+	// ================================================================================
 	// Inner Classes
 	// ================================================================================
 
@@ -142,13 +152,14 @@ private SwingWorker<String, String> pollingWorker;
 	 * Contains all necessary information for the client to guide the user through the
 	 * authorization process and to poll for the access token.
 	 */
-static class DeviceCodeResponse {
-    private String deviceCode;
-    private String userCode;
-    private String verificationUri;
-    private int expiresIn;
-    private int interval;
-        /**
+	static class DeviceCodeResponse {
+		private String deviceCode;
+		private String userCode;
+		private String verificationUri;
+		private int expiresIn;
+		private int interval;
+
+		/**
 		 * Constructs a DeviceCodeResponse with all required fields.
 		 * 
 		 * @param deviceCode the device code used to poll for token (40 alphanumeric characters)
@@ -157,56 +168,59 @@ static class DeviceCodeResponse {
 		 * @param expiresIn the validity period of the codes in seconds
 		 * @param interval the minimum polling interval in seconds recommended by GitHub
 		 */
-    public DeviceCodeResponse(String deviceCode, String userCode, String verificationUri, int expiresIn, int interval) {
-        this.deviceCode = deviceCode;
-        this.userCode = userCode;
-        this.verificationUri = verificationUri;
-        this.expiresIn = expiresIn;
-        this.interval = interval;
-    }
-        /**
+		public DeviceCodeResponse(String deviceCode, String userCode, String verificationUri, int expiresIn, int interval) {
+			this.deviceCode = deviceCode;
+			this.userCode = userCode;
+			this.verificationUri = verificationUri;
+			this.expiresIn = expiresIn;
+			this.interval = interval;
+		}
+
+		/**
 		 * Returns the device code.
 		 * 
 		 * @return the device code string
 		 */
-    public String getDeviceCode() {
-        return deviceCode;
-    }
+		public String getDeviceCode() {
+			return deviceCode;
+		}
+
 		/**
 		 * Returns the user-friendly code to be entered at the verification URI.
 		 * 
 		 * @return the user code string
 		 */
+		public String getUserCode() {
+			return userCode;
+		}
 
-    public String getUserCode() {
-        return userCode;
-    }
 		/**
 		 * Returns the URI where the user should enter the device code.
 		 * 
 		 * @return the verification URI string
 		 */
-    public String getVerificationUri() {
-        return verificationUri;
-    }
+		public String getVerificationUri() {
+			return verificationUri;
+		}
+
 		/**
 		 * Returns the validity period of the codes.
 		 * 
 		 * @return the expiration time in seconds
 		 */
-    public int getExpiresIn() {
-        return expiresIn;
-    }
+		public int getExpiresIn() {
+			return expiresIn;
+		}
 
 		/**
 		 * Returns the recommended polling interval.
 		 * 
 		 * @return the polling interval in seconds
 		 */
-    public int getInterval() {
-        return interval;
-    }
-}
+		public int getInterval() {
+			return interval;
+		}
+	}
 
 	/**
 	 * Callback interface for receiving authentication flow events.
@@ -215,8 +229,7 @@ static class DeviceCodeResponse {
 	 * making it safe to update UI components directly. Implementations should
 	 * return quickly to avoid blocking the EDT.
 	 */
-public interface AuthCallback {
-    
+	public interface AuthCallback {
 		/**
 		 * Called when the user code has been successfully obtained from GitHub.
 		 * 
@@ -226,8 +239,8 @@ public interface AuthCallback {
 		 * @param userCode the user-friendly code for manual entry at the verification URI
 		 * @param expiresIn the validity period of the code in seconds
 		 */
-    void onUserCodeReceived(String userCode, int expiresIn);
-    
+		void onUserCodeReceived(String userCode, int expiresIn);
+
 		/**
 		 * Called periodically during the polling phase to update UI status.
 		 * 
@@ -236,8 +249,8 @@ public interface AuthCallback {
 		 * 
 		 * @param message a descriptive status message
 		 */
-    void onStatusUpdate(String message);
-    
+		void onStatusUpdate(String message);
+
 		/**
 		 * Called when authentication succeeds and a valid access token is obtained.
 		 * 
@@ -246,8 +259,8 @@ public interface AuthCallback {
 		 * 
 		 * @param accessToken the valid GitHub access token
 		 */
-    void onSuccess(String accessToken);
-    
+		void onSuccess(String accessToken);
+
 		/**
 		 * Called when authentication fails or is cancelled.
 		 * 
@@ -261,8 +274,8 @@ public interface AuthCallback {
 		 * 
 		 * @param errorMessage a description of the failure reason
 		 */
-    void onFailure(String errorMessage);
-}
+		void onFailure(String errorMessage);
+	}
 
 	// ================================================================================
 	// Private Helper Methods
@@ -282,34 +295,40 @@ public interface AuthCallback {
 	 * @param key the JSON key to extract (without quotes)
 	 * @return the extracted value, or {@code null} if the key is not found or parsing fails
 	 */
-private String extractJsonValue(String json, String key) {
-    String searchKey = "\"" + key + "\":";
-    int keyIndex = json.indexOf(searchKey);
-    if (keyIndex == -1) return null;
+	private String extractJsonValue(String json, String key) {
+		String searchKey = "\"" + key + "\":";
+		int keyIndex = json.indexOf(searchKey);
+		if (keyIndex == -1) {
+			return null;
+		}
 
-    int valueStart = keyIndex+searchKey.length();
-     // skip whitespace between colon and value
-    while (valueStart < json.length() && 
-           Character.isWhitespace(json.charAt(valueStart))) {
-        valueStart++;
-    }
-    if (valueStart >= json.length()) return null;
+		int valueStart = keyIndex + searchKey.length();
+		// Skip whitespace between colon and value
+		while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
+			valueStart++;
+		}
+		if (valueStart >= json.length()) {
+			return null;
+		}
 
-    if (json.charAt(valueStart)=='"') 
-    {
-    valueStart++;
-    int valueEnd = json.indexOf('"', valueStart);
-    if (valueEnd == -1) return null;
-    return json.substring(valueStart, valueEnd);
-    }
-    else
-    {
-    int valueEnd = json.indexOf(",", valueStart);
-    if (valueEnd == -1) valueEnd = json.indexOf("}", valueStart);
-    if (valueEnd == -1) return null;
-    return json.substring(valueStart, valueEnd).trim();
-    }        
-}
+		if (json.charAt(valueStart) == '"') {
+			valueStart++;
+			int valueEnd = json.indexOf('"', valueStart);
+			if (valueEnd == -1) {
+				return null;
+			}
+			return json.substring(valueStart, valueEnd);
+		} else {
+			int valueEnd = json.indexOf(",", valueStart);
+			if (valueEnd == -1) {
+				valueEnd = json.indexOf("}", valueStart);
+			}
+			if (valueEnd == -1) {
+				return null;
+			}
+			return json.substring(valueStart, valueEnd).trim();
+		}
+	}
 
 	/**
 	 * Validates an access token by making a test request to the GitHub API.
@@ -323,29 +342,28 @@ private String extractJsonValue(String json, String key) {
 	 * @param token the access token to validate
 	 * @return {@code true} if the token is valid, {@code false} otherwise
 	 */
-private boolean isTokenValid(String token) {
-    HttpURLConnection conn = null;
-    try {
-        URL url = new URL("https://api.github.com/user");
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + token);
-        conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
+	private boolean isTokenValid(String token) {
+		HttpURLConnection conn = null;
+		try {
+			URL url = new URL("https://api.github.com/user");
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setRequestProperty("Authorization", "Bearer " + token);
+			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
+			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+			conn.setReadTimeout(READ_TIMEOUT_MS);
 
-        int responseCode = conn.getResponseCode();
-       return responseCode == HttpURLConnection.HTTP_OK;
-    } 
-    catch (Exception e) {
-        return false; }
-        finally {
-        if (conn != null) {
-            conn.disconnect();
-        } 
-        }
-}
+			int responseCode = conn.getResponseCode();
+			return responseCode == HttpURLConnection.HTTP_OK;
+		} catch (Exception e) {
+			return false;
+		} finally {
+			if (conn != null) {
+				conn.disconnect();
+			}
+		}
+	}
 
 	/**
 	 * Requests device and user codes from GitHub's device code endpoint.
@@ -356,58 +374,57 @@ private boolean isTokenValid(String token) {
 	 * @return a {@link DeviceCodeResponse} containing the device code, user code, and metadata
 	 * @throws IOException if the HTTP request fails or the response is invalid
 	 */
-private DeviceCodeResponse requestDeviceCodes() throws IOException {
-    HttpURLConnection conn = null;
-    try {
-        URL url = new URL(DEVICE_CODE_URL);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setDoOutput(true);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        String requestBody = "client_id=" + CLIENT_ID +"&scope=repo";
+	private DeviceCodeResponse requestDeviceCodes() throws IOException {
+		HttpURLConnection conn = null;
+		try {
+			URL url = new URL(DEVICE_CODE_URL);
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setDoOutput(true);
+			conn.setRequestMethod("POST");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
+			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+			conn.setReadTimeout(READ_TIMEOUT_MS);
+			String requestBody = "client_id=" + CLIENT_ID + "&scope=repo";
 
-        //try with resources to ensure stream is closed properly
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(requestBody.getBytes(StandardCharsets.UTF_8));
-        }
-        int statusCode = conn.getResponseCode();
-        if (statusCode != HttpURLConnection.HTTP_OK) {
-            throw new IOException("Failed to request device code: HTTP " + statusCode);
-        }
-        //read response body full
-          StringBuilder response = new StringBuilder();
-           try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) 
-        {
-            String line;
-            while ((line = reader.readLine()) != null) 
-            {
-                response.append(line);
-            }
-        }
-        String json = response.toString();
-        String deviceCode = extractJsonValue(json, "device_code");
-        String userCode = extractJsonValue(json, "user_code");
-        String verificationUri = extractJsonValue(json, "verification_uri");
-        String intervalStr = extractJsonValue(json, "interval");
-        String expiresInStr = extractJsonValue(json, "expires_in");
-    
-        if (deviceCode == null || userCode == null || verificationUri == null || intervalStr == null || expiresInStr == null) {
-            throw new IOException("Invalid response from GitHub: missing required fields");
-        }
-        int interval = Integer.parseInt(intervalStr);
-        int expiresIn = Integer.parseInt(expiresInStr);
-        return new DeviceCodeResponse(deviceCode, userCode, verificationUri, expiresIn, interval);
-    } 
-     finally {
-        if (conn != null) {
-            conn.disconnect();
-        }
-    }
-}
+			// Try with resources to ensure stream is closed properly
+			try (OutputStream os = conn.getOutputStream()) {
+				os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+			}
+			int statusCode = conn.getResponseCode();
+			if (statusCode != HttpURLConnection.HTTP_OK) {
+				throw new IOException("Failed to request device code: HTTP " + statusCode);
+			}
+
+			// Read response body in full
+			StringBuilder response = new StringBuilder();
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					response.append(line);
+				}
+			}
+
+			String json = response.toString();
+			String deviceCode = extractJsonValue(json, "device_code");
+			String userCode = extractJsonValue(json, "user_code");
+			String verificationUri = extractJsonValue(json, "verification_uri");
+			String intervalStr = extractJsonValue(json, "interval");
+			String expiresInStr = extractJsonValue(json, "expires_in");
+
+			if (deviceCode == null || userCode == null || verificationUri == null || intervalStr == null || expiresInStr == null) {
+				throw new IOException("Invalid response from GitHub: missing required fields");
+			}
+			int interval = Integer.parseInt(intervalStr);
+			int expiresIn = Integer.parseInt(expiresInStr);
+			return new DeviceCodeResponse(deviceCode, userCode, verificationUri, expiresIn, interval);
+		} finally {
+			if (conn != null) {
+				conn.disconnect();
+			}
+		}
+	}
 
 	/**
 	 * Polls GitHub's access token endpoint for the authorization result.
@@ -425,85 +442,67 @@ private DeviceCodeResponse requestDeviceCodes() throws IOException {
 	 * @return the access token if authorization is successful, {@code null} if still pending
 	 * @throws IOException if the device code has expired, access was denied, or a critical error occurs
 	 */
-private String pollForAccessToken() throws IOException 
-{
-    HttpURLConnection conn = null;
-    try 
-    {
-        URL url = new URL(ACCESS_TOKEN_URL);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setDoOutput(true);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
+	private String pollForAccessToken() throws IOException {
+		HttpURLConnection conn = null;
+		try {
+			URL url = new URL(ACCESS_TOKEN_URL);
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setDoOutput(true);
+			conn.setRequestMethod("POST");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
+			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+			conn.setReadTimeout(READ_TIMEOUT_MS);
 
-        String requestBody = "client_id=" + CLIENT_ID
-            + "&device_code=" + deviceCode
-            + "&grant_type=urn:ietf:params:oauth:grant-type:device_code";
+			String requestBody = "client_id=" + CLIENT_ID
+				+ "&device_code=" + deviceCode
+				+ "&grant_type=urn:ietf:params:oauth:grant-type:device_code";
 
-        try (OutputStream os = conn.getOutputStream()) 
-        {
-            os.write(requestBody.getBytes(StandardCharsets.UTF_8));
-        }
-         int statusCode = conn.getResponseCode();
-        if (statusCode != HttpURLConnection.HTTP_OK)
-        {
-            throw new IOException("GitHub access token poll failed: HTTP " + statusCode);
-        }
-        
-        StringBuilder response = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)))
-        {
-            String line;
-            while ((line = reader.readLine()) != null)
-            {
-                response.append(line);
-            }
-        }
+			try (OutputStream os = conn.getOutputStream()) {
+				os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+			}
 
-        String json = response.toString();
-        String accessToken = extractJsonValue(json, "access_token");
-        String error = extractJsonValue(json, "error");
+			int statusCode = conn.getResponseCode();
+			if (statusCode != HttpURLConnection.HTTP_OK) {
+				throw new IOException("GitHub access token poll failed: HTTP " + statusCode);
+			}
 
-         if (accessToken != null)
-        {
-            return accessToken;
-        }
-         else if ("authorization_pending".equals(error))
-        {
-            return null;
-        }
-        // GitHub is being hit too fast, RFC 8628 requires adding 5 seconds interval
-        else if ("slow_down".equals(error))
-        {
-            interval += 5;
-            return null;
-        }
-        //device code window closed, user did not enter the code in time
-        else if ("expired_token".equals(error))
-        {
-            throw new IOException(
-                "Authentication code expired. Please sign in again.");
-        }
-       //case where user saw the code and explicitly clicked deny
-        else if ("access_denied".equals(error))
-        {
-            throw new IOException(
-                "Access denied. User rejected the authorization request.");
-        }
-        else
-        {
-            return null;
-        }
-    } 
-    finally 
-    {
-        if (conn != null) conn.disconnect();
-    }
-}
+			StringBuilder response = new StringBuilder();
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					response.append(line);
+				}
+			}
+
+			String json = response.toString();
+			String accessToken = extractJsonValue(json, "access_token");
+			String error = extractJsonValue(json, "error");
+
+			if (accessToken != null) {
+				return accessToken;
+			} else if ("authorization_pending".equals(error)) {
+				return null;
+			} else if ("slow_down".equals(error)) {
+				// GitHub is being hit too fast, RFC 8628 requires adding 5 seconds interval
+				interval += 5;
+				return null;
+			} else if ("expired_token".equals(error)) {
+				// Device code window closed, user did not enter the code in time
+				throw new IOException("Authentication code expired. Please sign in again.");
+			} else if ("access_denied".equals(error)) {
+				// User saw the code and explicitly clicked deny
+				throw new IOException("Access denied. User rejected the authorization request.");
+			} else {
+				return null;
+			}
+		} finally {
+			if (conn != null) {
+				conn.disconnect();
+			}
+		}
+	}
 
 	/**
 	 * Creates (but does not execute) a {@link SwingWorker} for polling the access token endpoint.
@@ -581,61 +580,58 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
 	 * @param callback the {@link AuthCallback} to invoke with flow events
 	 * @deprecated Not yet implemented; reserved for future use.
 	 */
-private void beginDeviceAuthFlow(AuthCallback callback)
-{
-    //method to start the device auth flow, runs on EDT, UI access allowed
-    // TODO: implement in next session
-}
-// ================================================================================
+	private void beginDeviceAuthFlow(AuthCallback callback) {
+		// Method to start the device auth flow, runs on EDT, UI access allowed.
+		// TODO: implement in next session
+	}
+
+	// ================================================================================
 	// Public Authentication Methods
 	// ================================================================================
 
-    /**
-     * Starts the GitHub authentication process using the device code flow.
-     * 
-     * This method first checks for an existing token and validates it. If the token is valid,
-     * it immediately invokes {@code callback.onSuccess} with the token. If the token is invalid
-     * or not present, it initiates the device code flow by requesting new codes and guiding the
-     * user through the authorization process.
-     * 
-     * All operations are performed asynchronously to avoid blocking the UI. Callback methods are
-     * invoked on the EDT, making it safe to update UI components directly.
-     * 
-     * @param callback the {@link AuthCallback} to receive authentication events and results
-     */ 
-public void startAuthentication(AuthCallback callback) 
-{
-    String existingToken = TokenManager.getToken();
-    if (existingToken != null) 
-    {
-        //needs to be validated with GitHub API, must be done in background thread
-        SwingWorker<Boolean, Void> validationWorker = new SwingWorker<Boolean, Void>() {
+	/**
+	 * Starts the GitHub authentication process using the device code flow.
+	 * 
+	 * This method first checks for an existing token and validates it. If the token is valid,
+	 * it immediately invokes {@code callback.onSuccess} with the token. If the token is invalid
+	 * or not present, it initiates the device code flow by requesting new codes and guiding the
+	 * user through the authorization process.
+	 * 
+	 * All operations are performed asynchronously to avoid blocking the UI. Callback methods are
+	 * invoked on the EDT, making it safe to update UI components directly.
+	 * 
+	 * @param callback the {@link AuthCallback} to receive authentication events and results
+	 */
+	public void startAuthentication(AuthCallback callback) {
+		String existingToken = TokenManager.getToken();
+		if (existingToken != null) {
+			// Needs to be validated with GitHub API, must be done in background thread
+			SwingWorker<Boolean, Void> validationWorker = new SwingWorker<Boolean, Void>() {
+				@Override
+				protected Boolean doInBackground() throws Exception {
+					return isTokenValid(existingToken);
+				}
 
-            @Override
-            protected Boolean doInBackground() throws Exception {
-                return isTokenValid(existingToken);
-            }
-            @Override //runs on EDT
-            protected void done() {
-                try {
-                    if(get()) 
-                    callback.onSuccess(existingToken);
-                    else {
-                        TokenManager.clearToken();
-                        beginDeviceAuthFlow(callback);
-                    }
-                } catch (Exception e) {
-                    // validation failed, start device flow, might be network error, treat as invalid token
-                    TokenManager.clearToken();
-                    beginDeviceAuthFlow(callback);
-                }
-            }
-        };
-        validationWorker.execute();
-    }
-    else 
-    {
-    beginDeviceAuthFlow(callback);
-    }
-}
+				@Override
+				protected void done() {
+					try {
+						if (get()) {
+							callback.onSuccess(existingToken);
+						} else {
+							TokenManager.clearToken();
+							beginDeviceAuthFlow(callback);
+						}
+					} catch (Exception e) {
+						// Validation failed, start device flow.
+						// Might be network error, treat as invalid token.
+						TokenManager.clearToken();
+						beginDeviceAuthFlow(callback);
+					}
+				}
+			};
+			validationWorker.execute();
+		} else {
+			beginDeviceAuthFlow(callback);
+		}
+	}
 }
