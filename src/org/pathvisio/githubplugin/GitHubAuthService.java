@@ -25,6 +25,11 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import javax.swing.SwingWorker;
 import org.pathvisio.githubplugin.util.TokenManager;
+import java.awt.Desktop;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Service class for managing GitHub OAuth 2.0 Device Flow authentication.
@@ -77,7 +82,7 @@ import org.pathvisio.githubplugin.util.TokenManager;
  * GitHub OAuth application client ID before authentication can succeed. This ID should be
  * obtained by registering the application at github.com/settings/applications/new.</p>
  * 
- * @author PathVisio Team
+ * @author Snehashree Prusty
  * @version 1.0
  * @see AuthCallback
  * @see SwingWorker
@@ -504,17 +509,23 @@ public class GitHubAuthService {
 		}
 	}
 
-	/**
-	 * Creates (but does not execute) a {@link SwingWorker} for polling the access token endpoint.
-	 * 
-	 * The caller is responsible for invoking {@link SwingWorker#execute()} on the returned worker.
-	 * This method runs on the EDT and is safe for UI operations.
-	 * 
-	 * @param callback the {@link AuthCallback} to invoke with results
-	 * @param expiresIn the validity period of the device code in seconds
-	 * @return a new {@link SwingWorker} for polling, ready to be executed by the caller
-	 * @deprecated Not yet implemented; reserved for future use.
-	 */
+/**
+ * Creates but does not execute a {@link SwingWorker} that polls
+ * GitHub's access token endpoint until authorization completes,
+ * the device code expires, or the user cancels.
+ *
+ * <p>The polling loop respects GitHub's required interval between
+ * requests per RFC 8628. If GitHub returns a {@code slow_down}
+ * response, the interval is increased by 5 seconds automatically.</p>
+ *
+ * <p>The caller is responsible for calling {@link SwingWorker#execute()}
+ * on the returned worker. This separation allows the caller to store
+ * the worker reference before starting it.</p>
+ *
+ * @param callback the {@link AuthCallback} to notify with results
+ * @param expiresIn the device code validity period in seconds
+ * @return a configured but unstarted {@link SwingWorker}
+ */
 private SwingWorker<String, String> createPollingWorker(AuthCallback callback, int expiresIn)
 {
    return new SwingWorker<String, String>() {
@@ -566,28 +577,145 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
         }
     };
 }
-	/**
-	 * Begins the device code OAuth flow after token validation is needed.
-	 * 
-	 * This method is called when:
-	 * <ul>
-	 * <li>No existing token is stored</li>
-	 * <li>An existing token is invalid or expired</li>
-	 * </ul>
-	 * 
-	 * Runs on the EDT and is safe for UI operations.
-	 * 
-	 * @param callback the {@link AuthCallback} to invoke with flow events
-	 * @deprecated Not yet implemented; reserved for future use.
-	 */
+/**
+ * Initiates the GitHub Device Authorization flow.
+ *
+ * <p>Requests device and user codes from GitHub, displays the user
+ * code via callback, opens the user's default browser to the
+ * verification URI, and starts the polling worker.</p>
+ *
+ * <p>Called when no valid token exists in local storage.</p>
+ *
+ * <p>Must be called from the EDT. All network operations are
+ * performed on a background thread internally.</p>
+ *
+ * @param callback the {@link AuthCallback} to notify with flow events
+ */
 	private void beginDeviceAuthFlow(AuthCallback callback) {
-		// Method to start the device auth flow, runs on EDT, UI access allowed.
-		// TODO: implement in next session
-	}
+		SwingWorker <DeviceCodeResponse, Void> setUpWorker = new SwingWorker<DeviceCodeResponse, Void>()
+        {
+            @Override
+            protected DeviceCodeResponse doInBackground() throws Exception {
+                return requestDeviceCodes();
+        }
+            @Override
+            protected void done()
+            {
+                try {
+                    DeviceCodeResponse response = get();
+                    deviceCode = response.getDeviceCode();
+                    interval = response.getInterval();
+                    callback.onUserCodeReceived(response.getUserCode(), response.getExpiresIn());
+                    
+                    if (Desktop.isDesktopSupported())
+                    {
+                        Desktop desktop = Desktop.getDesktop();
+                        if (desktop.isSupported(Desktop.Action.BROWSE))
+                        {
+                            desktop.browse(new URI(response.getVerificationUri()));
+                        }
+                        else
+                        {
+                          callback.onFailure("Unable to open browser. Please navigate to " + response.getVerificationUri() + " and enter the code: " + response.getUserCode());
+                          return;
+                        }
+                    }
+                    else
+                    {
+                        callback.onFailure("Desktop not supported on this system. " +"Please visit: " + response.getVerificationUri());
+                        return;
+                    }
+
+                     pollingWorker = createPollingWorker(callback, response.getExpiresIn());
+                     pollingWorker.execute();
+                }
+                catch (ExecutionException e)
+                {
+                    callback.onFailure("Failed to connect to GitHub: " + e.getCause().getMessage());
+                }
+                catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                    callback.onFailure("Connection to GitHub was interrupted.");
+                }
+                catch (URISyntaxException e)
+                {
+                    callback.onFailure("Invalid verification URI provided by GitHub: " + e.getMessage());
+                }
+            }
+};
+    setUpWorker.execute();
+    }
 
 	// ================================================================================
 	// Public Authentication Methods
 	// ================================================================================
+
+ /**
+ * Cancels the ongoing GitHub Device Authorization polling process.
+ *
+ * <p>This method is safe to call at any time. If no authentication
+ * is currently in progress, or if the polling worker has already
+ * completed, this method does nothing.</p>
+ *
+ * <p>Calling this method interrupts any active {@link Thread#sleep}
+ * in the polling loop, ensuring immediate cancellation rather than
+ * waiting for the current sleep interval to expire.</p>
+ *
+ * <p>Must be called from the Event Dispatch Thread (EDT).</p>
+ */
+    public void cancelAuthentication()
+    {
+        if(pollingWorker != null && !pollingWorker.isDone())
+        {
+            pollingWorker.cancel(true);
+        }
+    }
+/**
+ * Returns whether a GitHub authentication session is currently
+ * in progress.
+ *
+ * <p>This method checks whether the polling worker is active —
+ * i.e., the user has been shown a device code and the plugin is
+ * waiting for them to authorize in their browser.</p>
+ *
+ * <p>Intended for use by the UI layer to manage button states.
+ * For example, the Cancel button should only be enabled when
+ * this method returns {@code true}.</p>
+ *
+ * <p>This method is safe to call on the EDT — no network calls
+ * are made.</p>
+ *
+ * @return {@code true} if polling is active, {@code false} otherwise
+ */
+    public boolean isAuthenticationInProgress()
+    {
+        return pollingWorker != null && !pollingWorker.isDone();
+    }   
+    /**
+ * Returns whether the user has a stored authentication token.
+ *
+ * <p>This method performs a fast local check against the operating
+ * system's credential storage via {@link TokenManager}. It does
+ * not make any network calls and is safe to call on the EDT.</p>
+ *
+ * <p>A return value of {@code true} indicates a token exists in
+ * storage but does not guarantee the token is still valid on GitHub.
+ * Token validity is verified lazily — a revoked token will be
+ * detected and cleared when {@link #startAuthentication} is next
+ * called.</p>
+ *
+ * <p>Intended for use on application startup to determine whether
+ * to show the login screen or proceed directly to the contribution
+ * dashboard.</p>
+ *
+ * @return {@code true} if a token exists in local storage,
+ *         {@code false} if no token is stored
+ */
+public boolean isAuthenticated()
+{
+    return TokenManager.getToken() != null;
+}
 
 	/**
 	 * Starts the GitHub authentication process using the device code flow.
