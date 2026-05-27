@@ -30,6 +30,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import org.pathvisio.githubplugin.util.JsonParser;
 
 /**
  * Service class for managing GitHub OAuth 2.0 Device Flow authentication.
@@ -285,56 +286,7 @@ public class GitHubAuthService {
 	// ================================================================================
 	// Private Helper Methods
 	// ================================================================================
-
-	/**
-	 * Extracts a JSON value from a manually-parsed JSON string.
-	 * 
-	 * This method performs basic JSON parsing without external dependencies,
-	 * handling both quoted string values and numeric/unquoted values.
-	 * 
-	 * <p><strong>Note:</strong> This is a simplified parser suitable only for
-	 * parsing GitHub's API responses. For complex or untrusted JSON, use a proper
-	 * JSON parsing library such as Gson or Jackson.</p>
-	 * 
-	 * @param json the JSON string to parse
-	 * @param key the JSON key to extract (without quotes)
-	 * @return the extracted value, or {@code null} if the key is not found or parsing fails
-	 */
-	private String extractJsonValue(String json, String key) {
-		String searchKey = "\"" + key + "\":";
-		int keyIndex = json.indexOf(searchKey);
-		if (keyIndex == -1) {
-			return null;
-		}
-
-		int valueStart = keyIndex + searchKey.length();
-		// Skip whitespace between colon and value
-		while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
-			valueStart++;
-		}
-		if (valueStart >= json.length()) {
-			return null;
-		}
-
-		if (json.charAt(valueStart) == '"') {
-			valueStart++;
-			int valueEnd = json.indexOf('"', valueStart);
-			if (valueEnd == -1) {
-				return null;
-			}
-			return json.substring(valueStart, valueEnd);
-		} else {
-			int valueEnd = json.indexOf(",", valueStart);
-			if (valueEnd == -1) {
-				valueEnd = json.indexOf("}", valueStart);
-			}
-			if (valueEnd == -1) {
-				return null;
-			}
-			return json.substring(valueStart, valueEnd).trim();
-		}
-	}
-
+	
 	/**
 	 * Validates an access token by making a test request to the GitHub API.
 	 * 
@@ -412,11 +364,11 @@ public class GitHubAuthService {
 			}
 
 			String json = response.toString();
-			String deviceCode = extractJsonValue(json, "device_code");
-			String userCode = extractJsonValue(json, "user_code");
-			String verificationUri = extractJsonValue(json, "verification_uri");
-			String intervalStr = extractJsonValue(json, "interval");
-			String expiresInStr = extractJsonValue(json, "expires_in");
+			String deviceCode = JsonParser.extractValue(json, "device_code");
+			String userCode = JsonParser.extractValue(json, "user_code");
+			String verificationUri = JsonParser.extractValue(json, "verification_uri");
+			String intervalStr = JsonParser.extractValue(json, "interval");
+			String expiresInStr = JsonParser.extractValue(json, "expires_in");
 
 			if (deviceCode == null || userCode == null || verificationUri == null || intervalStr == null || expiresInStr == null) {
 				throw new IOException("Invalid response from GitHub: missing required fields");
@@ -482,8 +434,8 @@ public class GitHubAuthService {
 			}
 
 			String json = response.toString();
-			String accessToken = extractJsonValue(json, "access_token");
-			String error = extractJsonValue(json, "error");
+			String accessToken = JsonParser.extractValue(json, "access_token");
+			String error = JsonParser.extractValue(json, "error");
 
 			if (accessToken != null) {
 				return accessToken;
