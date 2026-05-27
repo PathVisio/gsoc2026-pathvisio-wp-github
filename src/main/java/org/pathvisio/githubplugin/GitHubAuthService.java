@@ -612,8 +612,16 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
                         Desktop desktop = Desktop.getDesktop();
                         if (desktop.isSupported(Desktop.Action.BROWSE))
                         {
-                            desktop.browse(new URI(response.getVerificationUri()));
-                        }
+							try
+							{
+							   desktop.browse(new URI(response.getVerificationUri()));
+							}
+							catch (IOException e)
+							{
+								callback.onFailure("Failed to open browser. Please visit: " + response.getVerificationUri());
+                                return;
+                            }
+						}
                         else
                         {
                           callback.onFailure("Unable to open browser. Please navigate to " + response.getVerificationUri() + " and enter the code: " + response.getUserCode());

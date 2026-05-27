@@ -44,9 +44,9 @@
     <!-- =========================================================== -->
     <properties>
         <!-- Java version — PathVisio is built on Java 8 -->
-        <!-- Do NOT change to 11 or 17 — plugin must run inside PathVisio -->
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
 
         <!-- Ensures all source files are read as UTF-8 -->
         <!-- Prevents build warnings on Windows about encoding -->
