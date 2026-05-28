@@ -101,8 +101,14 @@ public class TokenManager
      * @see #clearToken()
      * @see #hasToken()
      */
+    
     public static void saveToken(String token) 
     {
+        if (token == null) 
+        {
+            clearToken();
+            return;
+        }
         prefs.put(TOKEN_KEY, token);
     }
     
@@ -163,6 +169,7 @@ public class TokenManager
      */
     public static boolean hasToken() 
     {
-        return getToken() != null;
+        // String token = getToken();
+        return getToken() != null && !getToken().trim().isEmpty(); 
     }
 }
