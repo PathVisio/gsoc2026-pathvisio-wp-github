@@ -38,10 +38,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("TokenManager")
 class TokenManagerTest {
 
-    // =========================================================================
-    // Fixture
-    // =========================================================================
-
     @BeforeEach
     void ensureCleanSlate() {
         TokenManager.clearToken();
@@ -52,15 +48,9 @@ class TokenManagerTest {
         TokenManager.clearToken();
     }
 
-    // =========================================================================
-    // SECTION 1 — Initial / empty state
-    //
-    // Verifies the invariant that "no token stored" is observable from every
-    // public method.  These are the baseline tests everything else depends on.
-    // =========================================================================
-
     /**
      * Tests for initial state when no token has been saved.
+     * Verifies the invariant that "no token stored" is observable from every public method.
      */
     @Nested
     @DisplayName("Initial state (no token stored)")
@@ -81,15 +71,9 @@ class TokenManagerTest {
         }
     }
 
-    // =========================================================================
-    // SECTION 2 — saveToken and getToken round-trip
-    //
-    // The core read-write contract: what goes in must come back out unchanged.
-    // Each test saves a distinct token shape to verify no transformation occurs.
-    // =========================================================================
-
     /**
      * Tests for the saveToken/getToken round-trip behavior.
+     * The core read-write contract: what goes in must come back out unchanged.
      */
     @Nested
     @DisplayName("saveToken / getToken round-trip")
@@ -141,16 +125,9 @@ class TokenManagerTest {
         }
     }
 
-    // =========================================================================
-    // SECTION 3 — clearToken
-    //
-    // clearToken() must reliably erase the stored token.  GitHubAuthService
-    // calls clearToken() when it detects a revoked/invalid token, so a failed
-    // clear would lock the user into a broken auth state indefinitely.
-    // =========================================================================
-
     /**
      * Tests for token clearing behavior and idempotency.
+     * Ensures clearToken() reliably erases the stored token without side effects.
      */
     @Nested
     @DisplayName("clearToken")
@@ -207,15 +184,9 @@ class TokenManagerTest {
         }
     }
 
-    // =========================================================================
-    // SECTION 4 — hasToken
-    //
-    // hasToken() is documented as a fast local check to avoid a network call.
-    // Its only job is to be consistent with getToken() != null.
-    // =========================================================================
-
     /**
      * Tests for hasToken consistency with getToken behavior.
+     * hasToken() should always be consistent with getToken() != null.
      */
     @Nested
     @DisplayName("hasToken consistency")
@@ -249,15 +220,9 @@ class TokenManagerTest {
         }
     }
 
-    // =========================================================================
-    // SECTION 5 — Defensive Guard Verification
-    //
-    // Verifies that TokenManager gracefully handles edge cases like null and
-    // empty string inputs rather than throwing internal platform exceptions.
-    // =========================================================================
-
     /**
      * Tests for defensive handling of edge case inputs.
+     * Verifies that TokenManager gracefully handles null, empty strings, and whitespace.
      */
     @Nested
     @DisplayName("Defensive guards")
