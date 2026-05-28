@@ -9,41 +9,38 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for TokenManager.
+ * Unit tests for {@link TokenManager}.
  *
- * -------------------------------------------------------------------------
- * IMPORTANT: TokenManager writes to the REAL operating-system Preferences
- * store (Windows Registry / macOS Keychain / ~/.java/.userPrefs on Linux).
- * These are NOT in-memory: data persists across JVM restarts.
+ * <p>These tests provide comprehensive coverage of TokenManager's static methods,
+ * ensuring reliable storage and retrieval of GitHub authentication tokens from the
+ * operating-system Preferences store. This test suite covers:</p>
+ * <ul>
+ * <li>Initial/empty state behavior</li>
+ * <li>Token save and retrieval round-trips with various token formats</li>
+ * <li>Token clearing and idempotency</li>
+ * <li>Consistency between hasToken() and getToken()</li>
+ * <li>Defensive handling of edge cases (null, empty strings, whitespace)</li>
+ * </ul>
  *
- * @BeforeEach and @AfterEach both call clearToken() to guarantee a clean
- * slate regardless of test order or prior failures.  Never remove them.
+ * <p><strong>Design Note:</strong> TokenManager is a static-only utility over
+ * java.util.Preferences with no dependency injection, so these tests execute
+ * against the real OS Preferences store (Windows Registry / macOS Keychain /
+ * ~/.java/.userPrefs on Linux). Both @BeforeEach and @AfterEach call clearToken()
+ * to ensure hermetic test execution: @BeforeEach handles cleanup from prior failures,
+ * @AfterEach prevents test pollution across runs.</p>
  *
- * WHY BOTH BEFORE AND AFTER?
- *   @BeforeEach alone: a crashed test leaves dirty state for the next run.
- *   @AfterEach alone:  a prior dirty state pollutes the first test.
- *   Both together:     hermetic in both directions.
- * -------------------------------------------------------------------------
+ * <p>This test suite ensures TokenManager behaves correctly under all expected
+ * conditions and serves as a specification for future maintenance and refactoring.</p>
  *
- * CLASS DESIGN NOTES (relevant to what we test)
- * -----------------------------------------------
- * TokenManager is a static-only utility over java.util.Preferences.
- * There is no dependency injection, so tests go against the real store.
- *
- * Two known limitations discovered during probe testing (see comments on
- * individual tests):
- *   1. saveToken(null)  → NullPointerException from Preferences.put()
- *   2. saveToken("")    → hasToken() returns true for an empty token value
- *
- * These tests document existing behaviour.  They are not meant to imply
- * the behaviour is correct — that is a call for the maintainer.
+ * @author Snehashree Prusty
+ * @version 1.0
  */
 @DisplayName("TokenManager")
 class TokenManagerTest {
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Fixture
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     @BeforeEach
     void ensureCleanSlate() {
@@ -62,6 +59,9 @@ class TokenManagerTest {
     // public method.  These are the baseline tests everything else depends on.
     // =========================================================================
 
+    /**
+     * Tests for initial state when no token has been saved.
+     */
     @Nested
     @DisplayName("Initial state (no token stored)")
     class InitialState {
@@ -88,6 +88,9 @@ class TokenManagerTest {
     // Each test saves a distinct token shape to verify no transformation occurs.
     // =========================================================================
 
+    /**
+     * Tests for the saveToken/getToken round-trip behavior.
+     */
     @Nested
     @DisplayName("saveToken / getToken round-trip")
     class SaveAndGet {
@@ -146,6 +149,9 @@ class TokenManagerTest {
     // clear would lock the user into a broken auth state indefinitely.
     // =========================================================================
 
+    /**
+     * Tests for token clearing behavior and idempotency.
+     */
     @Nested
     @DisplayName("clearToken")
     class ClearToken {
@@ -171,8 +177,6 @@ class TokenManagerTest {
         void clearTokenOnEmptyStoreDoesNotThrow() {
             // @BeforeEach already cleared, so storage is already empty.
             // This verifies clearToken() is idempotent — safe to call defensively.
-            // Internally this calls Preferences.remove() on a key that doesn't exist;
-            // probe testing confirmed the JDK treats this as a no-op, not an error.
             assertDoesNotThrow(TokenManager::clearToken);
         }
 
@@ -210,6 +214,9 @@ class TokenManagerTest {
     // Its only job is to be consistent with getToken() != null.
     // =========================================================================
 
+    /**
+     * Tests for hasToken consistency with getToken behavior.
+     */
     @Nested
     @DisplayName("hasToken consistency")
     class HasToken {
@@ -242,13 +249,16 @@ class TokenManagerTest {
         }
     }
 
-   // =========================================================================
+    // =========================================================================
     // SECTION 5 — Defensive Guard Verification
     //
     // Verifies that TokenManager gracefully handles edge cases like null and
     // empty string inputs rather than throwing internal platform exceptions.
     // =========================================================================
 
+    /**
+     * Tests for defensive handling of edge case inputs.
+     */
     @Nested
     @DisplayName("Defensive guards")
     class DefensiveGuards {
