@@ -7,6 +7,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets; 
 import java.util.Base64;
 import org.pathvisio.githubplugin.util.JsonParser;
+import org.pathvisio.core.model.Pathway;
+import org.pathvisio.libgpml.model.PathwayModel; 
 
 public class GpmlEncoder {
     public static String encodeToBase64(Pathway pathway) throws Exception {
