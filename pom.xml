@@ -44,8 +44,8 @@
     <!-- =========================================================== -->
     <properties>
         <!-- Java version — PathVisio is built on Java 8 -->
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
         
 
         <!-- Ensures all source files are read as UTF-8 -->
@@ -58,19 +58,14 @@
         <maven.surefire.version>3.1.2</maven.surefire.version>
         <maven.compiler.version>3.11.0</maven.compiler.version>
         <maven.jar.version>3.3.0</maven.jar.version>
-    </properties>
+    </properties> 
+
 
     <!-- =========================================================== -->
     <!-- Dependencies — libraries your plugin needs                   -->
     <!-- =========================================================== -->
-    <dependencies>
+   <dependencies>
 
-        <!--
-            JUnit 5 — test framework
-            scope=test means this jar is ONLY on the classpath during
-            mvn test — it is NOT included in your final plugin jar
-            This is correct — you do not ship test code to users
-        -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -78,30 +73,13 @@
             <scope>test</scope>
         </dependency>
 
-        <!--
-            NOTE: PathVisio core libraries are NOT declared here yet.
-            Your mentor will provide the correct Maven coordinates
-            or local jar references for:
-            - pathvisio-core
-            - libgpml
-            - org.pathvisio.desktop
-            Add them here when your mentor confirms the pom.xml setup.
-
-            Example of what they will look like:
-            <dependency>
-                <groupId>org.pathvisio</groupId>
-                <artifactId>pathvisio-core</artifactId>
-                <version>3.3.0</version>
-                <scope>provided</scope>
-            </dependency>
-
-            scope=provided means PathVisio core is already available
-            at runtime inside PathVisio itself — you do not bundle it
-            in your plugin jar. Only your plugin code goes in the jar.
-        -->
+        <dependency>
+            <groupId>org.pathvisio</groupId>
+            <artifactId>org.pathvisio.libgpml</artifactId>
+            <version>4.0.4</version>
+        </dependency>
 
     </dependencies>
-
     <!-- =========================================================== -->
     <!-- Build Configuration — how Maven compiles and packages        -->
     <!-- =========================================================== -->
@@ -119,8 +97,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven.compiler.version}</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <source>11</source>
+                    <target>11</target>
                     <encoding>UTF-8</encoding>
                     <!--
                         showWarnings: surfaces compilation warnings
