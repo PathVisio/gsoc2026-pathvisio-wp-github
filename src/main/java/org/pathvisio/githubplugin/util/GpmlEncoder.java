@@ -1,39 +1,39 @@
 package org.pathvisio.githubplugin.util;
 import java.io.StringWriter;           
-import java.io.BufferedReader;         
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStreamReader;      
 import java.net.HttpURLConnection;     
 import java.net.URL;                   
 import java.nio.charset.StandardCharsets; 
 import java.util.Base64;
 import org.pathvisio.githubplugin.util.JsonParser;
-import org.pathvisio.core.model.Pathway;
-import org.pathvisio.libgpml.model.PathwayModel; 
+import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.libgpml.model.GPMLFormat;
+import org.pathvisio.libgpml.io.ConverterException;
 
 public class GpmlEncoder {
-    public static String encodeToBase64(Pathway pathway) throws Exception {
-        // TODO: Implement pipeline calling M1, M2, and M3
-        throw new UnsupportedOperationException("Not yet implemented");
+    public static String encodeToBase64(PathwayModel pathwayModel) throws Exception {
+        String gpmlString = readAsString(pathwayModel);
+        byte[] utf8Bytes = toUtf8Bytes(gpmlString);
+        return toBase64(utf8Bytes);
     }
-    private static String readAsString(Pathway pathway) throws Exception {
-        // TODO: Utilize GPMLFormat to write to StringWriter
-        throw new UnsupportedOperationException("Not yet implemented");
+    private static String readAsString(PathwayModel pathwayModel) throws Exception {
+       ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try {
+            GPMLFormat.GPML2021.writeToXml(pathwayModel, outputStream, false);
+            return outputStream.toString(StandardCharsets.UTF_8.name());
+        } 
+        catch (ConverterException e) {
+            throw new Exception("Error converting PathwayModel to GPML string", e);
+        }
     }
-    private static byte[] toUtf8Bytes(String gpmlString) {
-        // TODO: Convert string using StandardCharsets.UTF_8
-        throw new UnsupportedOperationException("Not yet implemented");
+    private static byte[] toUtf8Bytes(String gpmlString) 
+    {
+        return gpmlString.getBytes(StandardCharsets.UTF_8);
     }
-    private static String toBase64(byte[] utf8Bytes) {
-        // TODO: Encode bytes using java.util.Base64
-        throw new UnsupportedOperationException("Not yet implemented");
+    private static String toBase64(byte[] utf8Bytes) 
+    {
+        return Base64.getEncoder().encodeToString(utf8Bytes);
     }
-    public static String fetchExistingFileSha(String pathInRepo, String accessToken) throws Exception {
-        // TODO: Setup HttpURLConnection GET request and parse JSON for "sha"
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
-    private static String readHttpResponse(HttpURLConnection conn) throws Exception {
-        // TODO: Read InputStreamReader wrapped in BufferedReader
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
-
 }
