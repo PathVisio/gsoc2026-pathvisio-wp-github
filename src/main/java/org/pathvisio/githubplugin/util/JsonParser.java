@@ -59,7 +59,7 @@ public final class JsonParser
      * <p>Example — numeric value:</p>
      * <pre>
      * String json = "{\"interval\":5,\"expires_in\":900}";
-     * String interval = JsonParser.extractJsonValue(json, "interval"); // "5"
+     * String interval = JsonParser.extractValue(json, "interval"); // "5"
      * int parsed = Integer.parseInt(interval);                     // 5
      * </pre>
      *
@@ -107,4 +107,29 @@ public final class JsonParser
 			return json.substring(valueStart, valueEnd).trim();
 		}
 	}
+    
+    /**
+     * Parses the "sha" value from a GitHub API response.
+     *
+     * <p>Specifically designed to extract the "sha" field from the JSON response
+     * returned by GitHub's repository content API when checking for existing files.</p>
+     *
+     * <p>Example:</p>
+     * <pre>
+     * String jsonResponse = "{\"name\":\"file.gpml\",\"path\":\"path/to/file.gpml\",\"sha\":\"abc123def456\"}";
+     * String sha = JsonParser.parseSHAFromResponse(jsonResponse); // "abc123def456"
+     * </pre>
+     *
+     * @param jsonResponse the raw JSON response string from GitHub's API
+     * @return the extracted "sha" value, or {@code null} if not found
+     */
+    public static String parseSHAFromResponse(String jsonResponse) throws Exception
+    {
+        String sha = extractValue(jsonResponse, "sha");
+        if (sha == null) {
+            throw new Exception("Failed to extract SHA from JSON response");
+        }
+        return sha;
+    }
+
 }
