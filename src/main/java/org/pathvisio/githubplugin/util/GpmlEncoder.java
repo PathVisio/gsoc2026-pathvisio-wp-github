@@ -105,4 +105,22 @@ public class GpmlEncoder {
             return responseBuilder.toString();
         }
     }
+
+    public String getExistingGpmlSHA(String apiURL, String accessToken) throws Exception {
+        URL url = new URL(apiURL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Authorization", "token " + accessToken);
+        connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
+        connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) 
+        {
+            String responseBody = readHttpResponse(connection);
+            return JsonParser.parseSHAFromResponse(responseBody);
+        } else 
+        {
+            throw new Exception("Failed to retrieve existing GPML SHA. HTTP response code: " + responseCode);
+        }
+    }
 }
