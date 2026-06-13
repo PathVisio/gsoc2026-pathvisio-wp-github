@@ -37,7 +37,7 @@ import org.pathvisio.libgpml.model.PathwayModel;
  * 
  * <p><strong>Key Responsibilities:</strong></p>
  * <ul>
- * <li>Convert PathwayModel objects to GPML 2021 XML format</li>
+ * <li>Convert PathwayModel objects to GPML 2013a XML format</li>
  * <li>Encode GPML strings to UTF-8 byte arrays</li>
  * <li>Encode byte arrays to Base64 strings for safe storage/transmission</li>
  * <li>Retrieve and parse existing GPML file SHA values from GitHub API</li>
@@ -68,10 +68,6 @@ import org.pathvisio.libgpml.model.PathwayModel;
  */
 public class GpmlEncoder {
 
-	// ================================================================================
-	// Public Encoding Methods
-	// ================================================================================
-
 	/**
 	 * Encodes a PathwayModel to a Base64-encoded string.
 	 * 
@@ -100,14 +96,10 @@ public class GpmlEncoder {
 		return toBase64(utf8Bytes);
 	}
 
-	// ================================================================================
-	// Private Conversion Methods
-	// ================================================================================
-
 	/**
 	 * Converts a PathwayModel to its GPML XML string representation.
 	 * 
-	 * Serializes the provided PathwayModel object using the GPML 2021 format
+	 * Serializes the provided PathwayModel object using the GPML 2013a format
 	 * and returns the result as a UTF-8 encoded string. This intermediate format
 	 * is required before Base64 encoding for use with GitHub API requests.
 	 * 
@@ -152,10 +144,6 @@ public class GpmlEncoder {
 		return Base64.getEncoder().encodeToString(utf8Bytes);
 	}
 
-	// ================================================================================
-	// Private HTTP Helper Methods
-	// ================================================================================
-
 	/**
 	 * Reads the response body from an HTTP connection.
 	 * 
@@ -180,10 +168,6 @@ public class GpmlEncoder {
 			return responseBuilder.toString();
 		}
 	}
-
-	// ================================================================================
-	// Public GitHub API Methods
-	// ================================================================================
 
 	/**
 	 * Retrieves the SHA value of an existing GPML file from GitHub.
