@@ -119,7 +119,7 @@ public class GpmlEncoder {
 	private static String readAsString(PathwayModel pathwayModel) throws Exception {
 		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 		try {
-			GPMLFormat.GPML2021.writeToXml(pathwayModel, outputStream, false);
+			GPMLFormat.GPML2013a.writeToXml(pathwayModel, outputStream, false);
 			return outputStream.toString(StandardCharsets.UTF_8.name());
 		} catch (ConverterException e) {
 			throw new Exception("Error converting PathwayModel to GPML string", e);
