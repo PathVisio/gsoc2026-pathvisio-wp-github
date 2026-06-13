@@ -1,6 +1,6 @@
 /*******************************************************************************
  * PathVisio, a tool for data visualization and analysis using biological pathways
- * Copyright 2006-2024 PathVisio
+ * Copyright 2006-2026 PathVisio
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License.  You may obtain a copy
@@ -571,8 +571,8 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
 							catch (IOException e)
 							{
 								callback.onFailure("Failed to open browser. Please visit: " + response.getVerificationUri());
-                                return;
-                            }
+                                 return;
+                             }
 						}
                         else
                         {
@@ -612,18 +612,18 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
 	// ================================================================================
 
  /**
- * Cancels the ongoing GitHub Device Authorization polling process.
- *
- * <p>This method is safe to call at any time. If no authentication
- * is currently in progress, or if the polling worker has already
- * completed, this method does nothing.</p>
- *
- * <p>Calling this method interrupts any active {@link Thread#sleep}
- * in the polling loop, ensuring immediate cancellation rather than
- * waiting for the current sleep interval to expire.</p>
- *
- * <p>Must be called from the Event Dispatch Thread (EDT).</p>
- */
+  * Cancels the ongoing GitHub Device Authorization polling process.
+  *
+  * <p>This method is safe to call at any time. If no authentication
+  * is currently in progress, or if the polling worker has already
+  * completed, this method does nothing.</p>
+  *
+  * <p>Calling this method interrupts any active {@link Thread#sleep}
+  * in the polling loop, ensuring immediate cancellation rather than
+  * waiting for the current sleep interval to expire.</p>
+  *
+  * <p>Must be called from the Event Dispatch Thread (EDT).</p>
+  */
     public void cancelAuthentication()
     {
         if(pollingWorker != null && !pollingWorker.isDone())

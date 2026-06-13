@@ -1,6 +1,6 @@
 /*******************************************************************************
  * PathVisio, a tool for data visualization and analysis using biological pathways
- * Copyright 2006-2024 PathVisio
+ * Copyright 2006-2026 PathVisio
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy
@@ -74,7 +74,7 @@ public final class JsonParser
      */
     public static String extractValue(String json, String key)
     {
-		String searchKey = "\"" + key + "\":";
+		String searchKey = "\"" + key + "\":\"";
 		int keyIndex = json.indexOf(searchKey);
 		if (keyIndex == -1) {
 			return null;
