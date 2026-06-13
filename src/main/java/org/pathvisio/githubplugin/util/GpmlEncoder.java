@@ -67,11 +67,11 @@ import org.pathvisio.libgpml.model.PathwayModel;
  * @see JsonParser
  */
 public class GpmlEncoder {
-
-	/**
-	 * Encodes a PathwayModel to a Base64-encoded string.
-	 * 
-	 * This method performs the following steps:
+    
+    /**
+     * Encodes a PathwayModel to a Base64-encoded string.
+     * 
+     * This method performs the following steps:
 	 * <ol>
 	 * <li>Converts the PathwayModel to a GPML XML string representation</li>
 	 * <li>Encodes the string as UTF-8 bytes</li>
