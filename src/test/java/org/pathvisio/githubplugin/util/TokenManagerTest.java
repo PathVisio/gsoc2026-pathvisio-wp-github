@@ -9,34 +9,37 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link TokenManager}.
+ * Tests for TokenManager.
  *
- * <p>These tests provide comprehensive coverage of TokenManager's static methods,
- * ensuring reliable storage and retrieval of GitHub authentication tokens from the
- * operating-system Preferences store. This test suite covers:</p>
- * <ul>
- * <li>Initial/empty state behavior</li>
- * <li>Token save and retrieval round-trips with various token formats</li>
- * <li>Token clearing and idempotency</li>
- * <li>Consistency between hasToken() and getToken()</li>
- * <li>Defensive handling of edge cases (null, empty strings, whitespace)</li>
- * </ul>
+ * -------------------------------------------------------------------------
+ * IMPORTANT: TokenManager writes to the REAL operating-system Preferences
+ * store (Windows Registry / macOS Keychain / ~/.java/.userPrefs on Linux).
+ * These are NOT in-memory: data persists across JVM restarts.
  *
- * <p><strong>Design Note:</strong> TokenManager is a static-only utility over
- * java.util.Preferences with no dependency injection, so these tests execute
- * against the real OS Preferences store (Windows Registry / macOS Keychain /
- * ~/.java/.userPrefs on Linux). Both @BeforeEach and @AfterEach call clearToken()
- * to ensure hermetic test execution: @BeforeEach handles cleanup from prior failures,
- * @AfterEach prevents test pollution across runs.</p>
+ * @BeforeEach and @AfterEach both call clearToken() to guarantee a clean
+ * slate regardless of test order or prior failures.  Never remove them.
  *
- * <p>This test suite ensures TokenManager behaves correctly under all expected
- * conditions and serves as a specification for future maintenance and refactoring.</p>
+ * WHY BOTH BEFORE AND AFTER?
+ *   @BeforeEach alone: a crashed test leaves dirty state for the next run.
+ *   @AfterEach alone:  a prior dirty state pollutes the first test.
+ *   Both together:     hermetic in both directions.
+ * -------------------------------------------------------------------------
  *
- * @author Snehashree Prusty
- * @version 1.0
+ * CLASS DESIGN NOTES (relevant to what we test)
+ * -----------------------------------------------
+ * TokenManager is a static-only utility over java.util.Preferences.
+ * There is no dependency injection, so tests go against the real store.
+ *
+ *
+ * These tests document existing behaviour.  They are not meant to imply
+ * the behaviour is correct — that is a call for the maintainer.
  */
 @DisplayName("TokenManager")
 class TokenManagerTest {
+
+    // -------------------------------------------------------------------------
+    // Fixture
+    // -------------------------------------------------------------------------
 
     @BeforeEach
     void ensureCleanSlate() {
@@ -47,11 +50,10 @@ class TokenManagerTest {
     void cleanUpAfterTest() {
         TokenManager.clearToken();
     }
+    // Verifies the invariant that "no token stored" is observable from every
+    // public method.  These are the baseline tests everything else depends on.
+    // =========================================================================
 
-    /**
-     * Tests for initial state when no token has been saved.
-     * Verifies the invariant that "no token stored" is observable from every public method.
-     */
     @Nested
     @DisplayName("Initial state (no token stored)")
     class InitialState {
@@ -59,8 +61,6 @@ class TokenManagerTest {
         @Test
         @DisplayName("getToken returns null when no token has been saved")
         void getTokenReturnsNullWhenNothingStored() {
-            // @BeforeEach has already called clearToken(), so storage is empty.
-            // This is the most fundamental contract: null means "not authenticated".
             assertNull(TokenManager.getToken());
         }
 
@@ -71,10 +71,11 @@ class TokenManagerTest {
         }
     }
 
-    /**
-     * Tests for the saveToken/getToken round-trip behavior.
-     * The core read-write contract: what goes in must come back out unchanged.
-     */
+  
+    // The core read-write contract: what goes in must come back out unchanged.
+    // Each test saves a distinct token shape to verify no transformation occurs.
+    // =========================================================================
+
     @Nested
     @DisplayName("saveToken / getToken round-trip")
     class SaveAndGet {
@@ -89,8 +90,11 @@ class TokenManagerTest {
         @Test
         @DisplayName("getToken returns a realistic GitHub PAT format unchanged")
         void getTokenRoundTripsRealisticToken() {
-            // Real GitHub OAuth tokens look like this.  Verifies the Preferences
+            // Real GitHub OAuth tokens look like this. Verifies the Preferences
             // store doesn't truncate, trim, or transform the value.
+            //NOTE: do NOT use an actual PAT here, even a revoked one.  Use a realistic fake format.
+            //the token used here is a randomly generated string that follows the typical structure of GitHub PATs,
+            //  but it is not valid and cannot be used to access any account.  This ensures we are testing the format handling without risking security or privacy issues.
             String realisticToken = "gho_16C7e42F292c6912E7710c838347Ae178B4a";
             TokenManager.saveToken(realisticToken);
             assertEquals(realisticToken, TokenManager.getToken());
@@ -99,8 +103,7 @@ class TokenManagerTest {
         @Test
         @DisplayName("getToken returns token value containing underscores and hyphens")
         void getTokenRoundTripsTokenWithSpecialChars() {
-            // GitHub tokens use underscores; some older formats use hyphens.
-            // Preferences should store these verbatim.
+           
             TokenManager.saveToken("github_pat_abc-123_DEF");
             assertEquals("github_pat_abc-123_DEF", TokenManager.getToken());
         }
@@ -108,10 +111,6 @@ class TokenManagerTest {
         @Test
         @DisplayName("calling saveToken twice keeps the second value, discarding the first")
         void secondSaveOverwritesFirst() {
-            // TEACHING POINT: this covers the mutation path — saves are not
-            // accumulated.  The second token should completely replace the first.
-            // This matters in GitHubAuthService: re-authentication must update
-            // the stored token, not silently fail.
             TokenManager.saveToken("first_token");
             TokenManager.saveToken("second_token");
             assertEquals("second_token", TokenManager.getToken());
@@ -125,10 +124,12 @@ class TokenManagerTest {
         }
     }
 
-    /**
-     * Tests for token clearing behavior and idempotency.
-     * Ensures clearToken() reliably erases the stored token without side effects.
-     */
+    
+    // clearToken() must reliably erase the stored token.  GitHubAuthService
+    // calls clearToken() when it detects a revoked/invalid token, so a failed
+    // clear would lock the user into a broken auth state indefinitely.
+   
+
     @Nested
     @DisplayName("clearToken")
     class ClearToken {
@@ -154,6 +155,8 @@ class TokenManagerTest {
         void clearTokenOnEmptyStoreDoesNotThrow() {
             // @BeforeEach already cleared, so storage is already empty.
             // This verifies clearToken() is idempotent — safe to call defensively.
+            // Internally this calls Preferences.remove() on a key that doesn't exist;
+            // probe testing confirmed the JDK treats this as a no-op, not an error.
             assertDoesNotThrow(TokenManager::clearToken);
         }
 
@@ -184,10 +187,13 @@ class TokenManagerTest {
         }
     }
 
-    /**
-     * Tests for hasToken consistency with getToken behavior.
-     * hasToken() should always be consistent with getToken() != null.
-     */
+    // =========================================================================
+    // SECTION 4 — hasToken
+    //
+    // hasToken() is documented as a fast local check to avoid a network call.
+    // Its only job is to be consistent with getToken() != null.
+    // =========================================================================
+
     @Nested
     @DisplayName("hasToken consistency")
     class HasToken {
@@ -220,10 +226,13 @@ class TokenManagerTest {
         }
     }
 
-    /**
-     * Tests for defensive handling of edge case inputs.
-     * Verifies that TokenManager gracefully handles null, empty strings, and whitespace.
-     */
+   // =========================================================================
+    // SECTION 5 — Defensive Guard Verification
+    //
+    // Verifies that TokenManager gracefully handles edge cases like null and
+    // empty string inputs rather than throwing internal platform exceptions.
+    // =========================================================================
+
     @Nested
     @DisplayName("Defensive guards")
     class DefensiveGuards {

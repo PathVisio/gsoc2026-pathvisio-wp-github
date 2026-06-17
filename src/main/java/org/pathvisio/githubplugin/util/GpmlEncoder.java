@@ -28,6 +28,7 @@ import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.libgpml.io.ConverterException;
 import org.pathvisio.libgpml.model.GPMLFormat;
 import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.githubplugin.util.HttpUtil;
 
 /**
  * Utility class for encoding GPML pathway models to Base64 format and managing HTTP responses.
