@@ -24,6 +24,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.libgpml.io.ConverterException;
 import org.pathvisio.libgpml.model.GPMLFormat;
 import org.pathvisio.libgpml.model.PathwayModel;
