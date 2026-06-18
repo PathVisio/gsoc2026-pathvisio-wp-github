@@ -118,7 +118,30 @@ public class GpmlEncoder {
 			throw new Exception("Error converting PathwayModel to GPML string", e);
 		}
 	}
-
+    /**
+	 * Reads the response body from an HTTP connection.
+	 * 
+	 * Reads all lines from the input stream of the provided HTTP connection,
+	 * combines them with newline separators, and returns the complete response body.
+	 * The input stream is automatically closed after reading due to try-with-resources.
+	 * 
+	 * <p><strong>Important:</strong> This method assumes the HTTP connection has already
+	 * been established and a successful response code has been verified by the caller.</p>
+	 * 
+	 * @param connection the HttpURLConnection to read the response from
+	 * @return the complete HTTP response body as a string
+	 * @throws Exception if an I/O error occurs while reading the response
+	 */
+	private static String readHttpResponse(HttpURLConnection connection) throws Exception {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+			StringBuilder responseBuilder = new StringBuilder();
+			String line;
+			while ((line = reader.readLine()) != null) {
+				responseBuilder.append(line).append("\n");
+			}
+			return responseBuilder.toString();
+		}
+	}
 	/**
 	 * Converts a GPML string to UTF-8 encoded bytes.
 	 * 
@@ -182,7 +205,7 @@ public class GpmlEncoder {
 
 		int responseCode = connection.getResponseCode();
 		if (responseCode == HttpURLConnection.HTTP_OK) {
-			String responseBody = HttpUtil.readResponseBody(connection);
+			String responseBody = readHttpResponse(connection);
 			return JsonParser.parseSHAFromResponse(responseBody);
 		} else {
 			throw new Exception("Failed to retrieve existing GPML SHA. HTTP response code: " + responseCode);
