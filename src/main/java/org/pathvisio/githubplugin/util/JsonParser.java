@@ -74,7 +74,7 @@ public final class JsonParser
      */
     public static String extractValue(String json, String key)
     {
-		String searchKey = "\"" + key + "\":\"";
+		String searchKey = "\"" + key + "\":";
 		int keyIndex = json.indexOf(searchKey);
 		if (keyIndex == -1) {
 			return null;
@@ -131,5 +131,36 @@ public final class JsonParser
         }
         return sha;
     }
+    /**
+ * Extracts a value from inside a nested JSON object.
+ * Example: for { "object": { "sha": "abc123" } }
+ * call extractNestedValue(json, "object", "sha") → returns "abc123"
+ *
+ */
+public static String extractNestedValue(String json, String outerKey, String innerKey) 
+{
+
+    String blockSearch = "\"" + outerKey + "\":{";
+    int blockStart = json.indexOf(blockSearch);
+    if (blockStart == -1) return null;
+    blockStart += blockSearch.length()-1;
+    int depth = 0;
+    int end = blockStart;
+    while (end < json.length()) 
+    {
+        if (json.charAt(end) == '{') 
+        depth++;
+        else if (json.charAt(end) == '}') 
+        {
+            depth--;
+            if (depth == 0) 
+            break;
+        }
+        end++; 
+    }
+    if (depth != 0) return null;
+    String innerBlock = json.substring(blockStart, end + 1);
+    return extractValue(innerBlock, innerKey);
+}
 
 }
