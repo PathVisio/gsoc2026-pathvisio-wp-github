@@ -37,7 +37,7 @@ public class HttpUtil
               stream = connection.getInputStream();
          }
          byte [] bytes = stream.readAllBytes();
-         return new String(bytes, java.nio.StandardCharsets.UTF_8);
+         return new String(bytes, StandardCharsets.UTF_8);
     }
 }
 
