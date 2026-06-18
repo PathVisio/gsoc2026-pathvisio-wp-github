@@ -24,13 +24,13 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.libgpml.io.ConverterException;
 import org.pathvisio.libgpml.model.GPMLFormat;
 import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.githubplugin.util.HttpUtil;
 
 /**
- * Utility class for encoding GPML pathway models to Base64 format and managing HTTP responses.
+ * An Utility class for encoding GPML pathway models to Base64 format and managing HTTP responses.
  * 
  * This class provides utility methods to serialize PathwayModel objects to GPML XML format,
  * encode them as UTF-8, and convert them to Base64 strings for storage or transmission.

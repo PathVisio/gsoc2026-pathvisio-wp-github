@@ -1,10 +1,9 @@
 package org.pathvisio.githubplugin;
 
-import org.pathvisio.githubplugin.util.HttpUtil;
-import org.pathvisio.githubplugin.util.JsonParser;
 import java.io.IOException;
 import java.net.HttpURLConnection;
-
+import org.pathvisio.githubplugin.util.HttpUtil;
+import org.pathvisio.githubplugin.util.JsonParser;
 public class GitHubBranchService 
 {
 
