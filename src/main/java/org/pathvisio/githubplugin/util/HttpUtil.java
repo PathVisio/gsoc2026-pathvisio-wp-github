@@ -23,10 +23,20 @@ public class HttpUtil
         connection.setRequestMethod(method);
         connection.setRequestProperty("Authorization", "Bearer " + token);
         connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
-        connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+        connection.setRequestProperty("X-GitHub-Api-Version", "2026-03-10");
         connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(READ_TIMEOUT_MS);
         return connection;
+    }
+
+    public static String readResponseBody (HttpURLConnection connection) throws IOException
+    {
+       java.io.InputStream stream = connection.getErrorStream();
+         if (stream == null) {
+              stream = connection.getInputStream();
+         }
+         byte [] bytes = stream.readAllBytes();
+         return new String(bytes, java.nio.StandardCharsets.UTF_8)
     }
 }
 
