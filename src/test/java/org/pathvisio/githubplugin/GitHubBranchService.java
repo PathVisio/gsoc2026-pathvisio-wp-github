@@ -39,6 +39,7 @@ public class GitHubBranchService
     {
         String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/ref/heads/" + branchName;
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", accessToken);
+        int status = connection.getResponseCode();
         if (status != 200) 
         {
             connection.disconnect();
@@ -86,7 +87,7 @@ public class GitHubBranchService
      {
         if (branchExists(branchName)) return branchName;
         String defaultBranch = getDefaultBranch(upstreamOwner);
-        String headSha = getHeadSha(defaultBranch);
+        String headSha = getHeadSHA(defaultBranch);
         createBranch(branchName, headSha);
         return branchName;
      }
