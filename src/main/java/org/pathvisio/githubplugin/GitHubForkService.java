@@ -31,7 +31,7 @@ public class GitHubForkService
     }
     public void createFork() throws IOException
     {
-        String endpoint = API_BASE + "/repos/" + UPSTREAM_OWNER + "/" + UPSTREAM_REPO + "/forks";
+        String endpoint = API_BASE + "/repos/" + UPSTREAM_OWNER + "/" + upstreamRepo + "/forks";
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "POST", accessToken);
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
