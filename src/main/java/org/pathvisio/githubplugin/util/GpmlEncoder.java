@@ -16,11 +16,8 @@
  ******************************************************************************/
 package org.pathvisio.githubplugin.util;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -42,7 +39,6 @@ import org.pathvisio.githubplugin.util.HttpUtil;
  * <li>Encode GPML strings to UTF-8 byte arrays</li>
  * <li>Encode byte arrays to Base64 strings for safe storage/transmission</li>
  * <li>Retrieve and parse existing GPML file SHA values from GitHub API</li>
- * <li>Read HTTP response bodies from GitHub API requests</li>
  * </ul>
  * 
  * <p><strong>Usage Example:</strong></p>
@@ -61,7 +57,7 @@ import org.pathvisio.githubplugin.util.HttpUtil;
  * SHA values of existing GPML files on GitHub, which is necessary for updating files
  * via the GitHub REST API.</p>
  * 
- * @author PathVisio Team
+ * @author Snehashree Prusty
  * @version 1.0
  * @see PathwayModel
  * @see GPMLFormat
@@ -118,30 +114,6 @@ public class GpmlEncoder {
 			throw new Exception("Error converting PathwayModel to GPML string", e);
 		}
 	}
-    /**
-	 * Reads the response body from an HTTP connection.
-	 * 
-	 * Reads all lines from the input stream of the provided HTTP connection,
-	 * combines them with newline separators, and returns the complete response body.
-	 * The input stream is automatically closed after reading due to try-with-resources.
-	 * 
-	 * <p><strong>Important:</strong> This method assumes the HTTP connection has already
-	 * been established and a successful response code has been verified by the caller.</p>
-	 * 
-	 * @param connection the HttpURLConnection to read the response from
-	 * @return the complete HTTP response body as a string
-	 * @throws Exception if an I/O error occurs while reading the response
-	 */
-	private static String readHttpResponse(HttpURLConnection connection) throws Exception {
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-			StringBuilder responseBuilder = new StringBuilder();
-			String line;
-			while ((line = reader.readLine()) != null) {
-				responseBuilder.append(line).append("\n");
-			}
-			return responseBuilder.toString();
-		}
-	}
 	/**
 	 * Converts a GPML string to UTF-8 encoded bytes.
 	 * 
@@ -190,25 +162,38 @@ public class GpmlEncoder {
 	 * @param apiURL the full GitHub API URL for the file contents endpoint
 	 *               (e.g., https://api.github.com/repos/owner/repo/contents/path/to/file.gpml)
 	 * @param accessToken the GitHub authentication token with appropriate permissions
-	 * @return the SHA value of the existing GPML file as a string
-	 * @throws Exception if the HTTP request fails, returns a non-200 status code,
-	 *                   or the response cannot be parsed for the SHA value
+	 * @return the SHA value of the existing GPML file, or {@code null} if the
+     *         file does not yet exist in the repository (HTTP 404). A null return
+     *         signals to the caller that this is a new pathway (create flow),
+     *         not an update to an existing one.
+     * @throws Exception if the HTTP request fails or returns an unexpected
+     *         status code other than 200 or 404
+     *                   or the response cannot be parsed for the SHA value
 	 * @see JsonParser#parseSHAFromResponse(String)
 	 */
-	public String getExistingGpmlSHA(String apiURL, String accessToken) throws Exception {
-		URL url = new URL(apiURL);
-		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-		connection.setRequestMethod("GET");
-		connection.setRequestProperty("Authorization", "token " + accessToken);
-		connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
-		connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+public static String getExistingGpmlSHA(String apiURL, String accessToken) throws Exception {
+    // Uses HttpUtil.openAuthenticatedConnection() — consistent with
+    // GitHubForkService and GitHubBranchService, and avoids direct
+    // new URL() construction which broke the Mockito URL-count test.
+    HttpURLConnection connection = 
+        HttpUtil.openAuthenticatedConnection(apiURL, "GET", accessToken);
 
-		int responseCode = connection.getResponseCode();
-		if (responseCode == HttpURLConnection.HTTP_OK) {
-			String responseBody = readHttpResponse(connection);
-			return JsonParser.parseSHAFromResponse(responseBody);
-		} else {
-			throw new Exception("Failed to retrieve existing GPML SHA. HTTP response code: " + responseCode);
-		}
-	}
+    int responseCode = connection.getResponseCode();
+
+    if (responseCode == HttpURLConnection.HTTP_OK) {
+        // File exists — parse and return its SHA for the update flow
+        String responseBody = HttpUtil.readResponseBody(connection);
+        connection.disconnect();
+        return JsonParser.parseSHAFromResponse(responseBody);
+    } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+        // 404 means file doesn't exist yet — this is a new pathway,
+        // not an error. Return null so caller knows to create, not update.
+        connection.disconnect();
+        return null;
+    } else {
+        connection.disconnect();
+        throw new Exception(
+            "Failed to retrieve existing GPML SHA. HTTP response code: " + responseCode);
+    }
+}
 }
