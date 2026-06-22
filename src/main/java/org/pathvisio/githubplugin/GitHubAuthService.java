@@ -94,9 +94,8 @@ public class GitHubAuthService {
 	 * GitHub OAuth application client ID.
 	 * 
 	 * Must be configured with a valid GitHub OAuth app client ID for authentication to work.
-	 * Obtain this value by registering an OAuth application at github.com/settings/applications/new
 	 */
-	private static final String CLIENT_ID = "";
+	private static final String CLIENT_ID = "Ov23lijbeHfxYZjidh2J"; //it is a public client id, so it is safe to keep it here.
 
 	/**
 	 * GitHub API endpoint for requesting device and user codes.
