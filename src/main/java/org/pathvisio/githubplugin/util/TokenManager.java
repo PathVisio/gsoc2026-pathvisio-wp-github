@@ -23,11 +23,11 @@ import java.util.prefs.Preferences;
  * 
  * <p>This class provides a simple interface for saving, retrieving, and clearing
  * GitHub access tokens using the Java {@link Preferences} API. Tokens are stored
- * securely in the platform-specific credential storage system:</p>
+ * in the platform-specific preferences system:</p>
  * <ul>
- * <li><strong>Windows:</strong> Stored in the Windows Registry under the current user's registry tree</li>
- * <li><strong>macOS:</strong> Stored in the user's default keychain</li>
- * <li><strong>Linux:</strong> Stored in the user's home directory under {@code ~/.java/.userPrefs}</li>
+ * <li><strong>Windows:</strong> Stored in the Windows Registry under the current user's registry tree (plaintext)</li>
+ * <li><strong>macOS:</strong> Stored in a plist file in the user's Library/Preferences directory (plaintext)</li>
+ * <li><strong>Linux:</strong> Stored in the user's home directory under {@code ~/.java/.userPrefs} (plaintext)</li>
  * </ul>
  * 
  * <p><strong>Thread Safety:</strong> The {@link Preferences} API is thread-safe,
