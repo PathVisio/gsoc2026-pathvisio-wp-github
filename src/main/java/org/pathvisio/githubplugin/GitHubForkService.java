@@ -8,18 +8,20 @@ public class GitHubForkService
 {
     private static final String API_BASE       = "https://api.github.com";
     private static final String UPSTREAM_OWNER = "wikipathways";
-    private static final String UPSTREAM_REPO  = "wikipathways-database";
+   
     private final String accessToken;
     private final String authenticatedUsername;
+    private final String upstreamRepo;
 
-    public GitHubForkService(String accessToken, String authenticatedUsername) 
+    public GitHubForkService(String accessToken, String authenticatedUsername, String upstreamRepo) 
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamRepo = upstreamRepo;
     }
     public boolean forkExists() throws IOException 
     {
-        String endpoint = API_BASE + "/repos/" + authenticatedUsername + "/" + UPSTREAM_REPO;
+        String endpoint = API_BASE + "/repos/" + authenticatedUsername + "/" + upstreamRepo;
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", accessToken);
         int status = connection.getResponseCode();
         connection.disconnect();
