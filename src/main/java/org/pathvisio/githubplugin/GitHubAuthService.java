@@ -450,7 +450,11 @@ public class GitHubAuthService {
 			} else if ("access_denied".equals(error)) {
 				// User saw the code and explicitly clicked deny
 				throw new IOException("Access denied. User rejected the authorization request.");
-			} else {
+			} 
+			else if (error != null) {
+			 throw new IOException("Unexpected error from GitHub: " + error);
+            }
+			else {
 				return null;
 			}
 		} finally {
