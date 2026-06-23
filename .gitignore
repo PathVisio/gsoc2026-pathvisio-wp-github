@@ -32,3 +32,4 @@ target/
 # Vim temporary swap files
 *.swp
 *.swo
+dependency-reduced-pom.xml
