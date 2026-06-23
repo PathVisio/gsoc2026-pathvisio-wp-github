@@ -30,6 +30,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+
+import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
 
 /**
@@ -110,11 +112,6 @@ public class GitHubAuthService {
 	 * This endpoint is used for polling authorization status during the authentication flow.
 	 */
 	private static final String ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
-
-	/**
-	 * GitHub REST API version used in request headers.
-	 */
-	private static final String GITHUB_API_VERSION = "2022-11-28";
 
 	/**
 	 * HTTP connection timeout in milliseconds.
@@ -299,27 +296,21 @@ public class GitHubAuthService {
 	 * @return {@code true} if the token is valid, {@code false} otherwise
 	 */
 	private boolean isTokenValid(String token) {
-		HttpURLConnection conn = null;
-		try {
-			URL url = new URL("https://api.github.com/user");
-			conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("GET");
-			conn.setRequestProperty("Accept", "application/json");
-			conn.setRequestProperty("Authorization", "Bearer " + token);
-			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
-			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-			conn.setReadTimeout(READ_TIMEOUT_MS);
-
-			int responseCode = conn.getResponseCode();
-			return responseCode == HttpURLConnection.HTTP_OK;
-		} catch (Exception e) {
-			return false;
-		} finally {
-			if (conn != null) {
-				conn.disconnect();
-			}
-		}
-	}
+        HttpURLConnection conn = null; 
+        try {
+           
+            conn = HttpUtil.openAuthenticatedConnection("https://api.github.com/user", "GET", token); 
+            int responseCode = conn.getResponseCode();
+            return responseCode == HttpURLConnection.HTTP_OK;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+	
 
 	/**
 	 * Requests device and user codes from GitHub's device code endpoint.
@@ -339,7 +330,6 @@ public class GitHubAuthService {
 			conn.setRequestMethod("POST");
 			conn.setRequestProperty("Accept", "application/json");
 			conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
 			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
 			conn.setReadTimeout(READ_TIMEOUT_MS);
 			String requestBody = "client_id=" + CLIENT_ID + "&scope=repo";
@@ -407,7 +397,6 @@ public class GitHubAuthService {
 			conn.setRequestMethod("POST");
 			conn.setRequestProperty("Accept", "application/json");
 			conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-			conn.setRequestProperty("X-GitHub-Api-Version", GITHUB_API_VERSION);
 			conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
 			conn.setReadTimeout(READ_TIMEOUT_MS);
 
