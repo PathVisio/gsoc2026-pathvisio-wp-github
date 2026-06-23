@@ -155,7 +155,7 @@ public class GpmlEncoder {
 	 * <p><strong>API Request Details:</strong></p>
 	 * <ul>
 	 * <li>HTTP Method: GET</li>
-	 * <li>Request Headers: Authorization token, GitHub API version (2022-11-28)</li>
+	 * <li>Request Headers: Authorization token, GitHub API version (2026-03-10)</li>
 	 * <li>Expected Response: JSON containing file metadata including the SHA field</li>
 	 * </ul>
 	 * 
