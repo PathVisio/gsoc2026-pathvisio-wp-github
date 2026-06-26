@@ -536,69 +536,65 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
  * @param callback the {@link AuthCallback} to notify with flow events
  */
 	private void beginDeviceAuthFlow(AuthCallback callback) {
-		SwingWorker <DeviceCodeResponse, Void> setUpWorker = new SwingWorker<DeviceCodeResponse, Void>()
-        {
-            @Override
-            protected DeviceCodeResponse doInBackground() throws Exception {
-                return requestDeviceCodes();
+    SwingWorker<DeviceCodeResponse, Void> setUpWorker = new SwingWorker<DeviceCodeResponse, Void>()
+    {
+        @Override
+        protected DeviceCodeResponse doInBackground() throws Exception {
+            return requestDeviceCodes();
         }
-            @Override
-            protected void done()
-            {
-                try {
-                    DeviceCodeResponse response = get();
-                    deviceCode = response.getDeviceCode();
-                    interval = response.getInterval();
-                    callback.onUserCodeReceived(response.getUserCode(), response.getExpiresIn());
-                    
-                    if (Desktop.isDesktopSupported())
+
+        @Override
+        protected void done()
+        {
+            try {
+                DeviceCodeResponse response = get();
+                deviceCode = response.getDeviceCode();
+                interval = response.getInterval();
+                callback.onUserCodeReceived(response.getUserCode(), response.getExpiresIn());
+
+                boolean browserOpened = false;
+                if (Desktop.isDesktopSupported())
+                {
+                    Desktop desktop = Desktop.getDesktop();
+                    if (desktop.isSupported(Desktop.Action.BROWSE))
                     {
-                        Desktop desktop = Desktop.getDesktop();
-                        if (desktop.isSupported(Desktop.Action.BROWSE))
+                        try
                         {
-							try
-							{
-							   desktop.browse(new URI(response.getVerificationUri()));
-							}
-							catch (IOException e)
-							{
-								callback.onFailure("Failed to open browser. Please visit: " + response.getVerificationUri());
-                                 return;
-                             }
-						}
-                        else
+                            desktop.browse(new URI(response.getVerificationUri()));
+                            browserOpened = true;
+                        }
+                        catch (IOException | URISyntaxException e)
                         {
-                          callback.onFailure("Unable to open browser. Please navigate to " + response.getVerificationUri() + " and enter the code: " + response.getUserCode());
-                          return;
+                            // fall through — browser failed, user navigates manually
                         }
                     }
-                    else
-                    {
-                        callback.onFailure("Desktop not supported on this system. " +"Please visit: " + response.getVerificationUri());
-                        return;
-                    }
+                }
 
-                     pollingWorker = createPollingWorker(callback, response.getExpiresIn());
-                     pollingWorker.execute();
-                }
-                catch (ExecutionException e)
+                if (!browserOpened)
                 {
-                    callback.onFailure("Failed to connect to GitHub: " + e.getCause().getMessage());
+                    callback.onStatusUpdate(
+                        "Could not open browser automatically. "
+                        + "Please visit: " + response.getVerificationUri()
+                        + " and enter code: " + response.getUserCode()
+                    );
                 }
-                catch (InterruptedException e)
-                {
-                    Thread.currentThread().interrupt();
-                    callback.onFailure("Connection to GitHub was interrupted.");
-                }
-                catch (URISyntaxException e)
-                {
-                    callback.onFailure("Invalid verification URI provided by GitHub: " + e.getMessage());
-                }
+
+                pollingWorker = createPollingWorker(callback, response.getExpiresIn());
+                pollingWorker.execute();
             }
-};
+            catch (ExecutionException e)
+            {
+                callback.onFailure("Failed to connect to GitHub: " + e.getCause().getMessage());
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+                callback.onFailure("Connection to GitHub was interrupted.");
+            }
+        }
+    };
     setUpWorker.execute();
-    }
-
+}
 	// ================================================================================
 	// Public Authentication Methods
 	// ================================================================================
