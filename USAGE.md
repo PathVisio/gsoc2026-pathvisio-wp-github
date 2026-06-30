@@ -50,8 +50,7 @@ The project currently lives at:
 https://github.com/PathVisio/gsoc2026-pathvisio-wp-github
 ```
 
-**This repository is private.** Right now access is limited to Sneha and
-mentor Martina Summer-Kutmon (Tina). If you're reading this and aren't one
+**This repository is private.** If you're reading this and aren't one
 of the two of us, you'll need to be added as a collaborator (or have org
 access under `PathVisio`) before cloning will work. Once access is
 confirmed:
