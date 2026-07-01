@@ -4,6 +4,36 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
+
+/**
+ * Service class that encapsulates GitHub branch-related operations used by the
+ * PathVisio GitHub integration plugin.
+ *
+ * <p>
+ * Responsibilities:
+ * <ul>
+ *   <li>Read repository metadata to discover the default branch for an upstream repo.</li>
+ *   <li>Query branch refs to obtain head SHAs and existence checks.</li>
+ *   <li>Create new branch refs in the user's fork.</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * This class performs simple REST calls to the GitHub REST API using
+ * HttpURLConnection wrapped by HttpUtil and parses JSON results via JsonParser.
+ * All network errors are surfaced as IOExceptions. Methods assume the provided
+ * access token is valid and has repository permissions in the fork (create refs).
+ * </p>
+ *
+ * <p>
+ * Notes aligned with the GSoC proposal:
+ * <ul>
+ *   <li>The plugin uses these methods after forking to create a branch for pathway edits.</li>
+ *   <li>Branch creation is performed by creating a new ref referencing an existing commit SHA.</li>
+ *   <li>Callers should ensure the fork exists and is up-to-date before creating branches; forking is asynchronous on GitHub.</li>
+ * </ul>
+ * </p>
+ */
 public class GitHubBranchService 
 {
 
@@ -13,6 +43,13 @@ public class GitHubBranchService
     private final String forkOwner;  
     private final String repoName;  
 
+    /**
+     * Create a new GitHubBranchService.
+     *
+     * @param accessToken A valid GitHub OAuth access token with repo permissions for the fork.
+     * @param forkOwner   The owner (username or org) of the fork where branches will be created.
+     * @param repoName    The repository name (e.g. "wikipathways-database").
+     */
     public GitHubBranchService(String accessToken, String forkOwner, String repoName) 
     {
         this.accessToken = accessToken;
@@ -20,6 +57,20 @@ public class GitHubBranchService
         this.repoName    = repoName;
     }
 
+    /**
+     * Fetches the default branch name for an upstream repository.
+     *
+     * <p>
+     * This method calls GET /repos/{upstreamOwner}/{repoName} and parses the
+     * "default_branch" field from the returned JSON. Example return values are
+     * commonly "main" or "master".
+     * </p>
+     *
+     * @param upstreamOwner The repository owner of the upstream (e.g. "wikipathways").
+     * @return The default branch name of the upstream repository.
+     * @throws IOException If the metadata cannot be retrieved or an unexpected HTTP status is returned.
+     * @see <a href="https://docs.github.com/en/rest/repos/repos#get-a-repository">GET /repos/{owner}/{repo}</a>
+     */
     public String getDefaultBranch(String upstreamOwner) throws IOException
     {
         String endpoint = API_BASE + "/repos/" + upstreamOwner + "/" + repoName;
@@ -34,6 +85,21 @@ public class GitHubBranchService
         connection.disconnect();
         return JsonParser.extractValue(body, "default_branch");
     }
+
+    /**
+     * Returns the commit SHA (object.sha) pointed to by the named branch in the configured fork.
+     *
+     * <p>
+     * Calls GET /repos/{forkOwner}/{repoName}/git/ref/heads/{branchName} and extracts
+     * the nested "object.sha" value. The returned SHA is suitable to use as the
+     * base for creating a new branch ref.
+     * </p>
+     *
+     * @param branchName The branch name (without refs/heads/), e.g. "main".
+     * @return The SHA string of the branch head.
+     * @throws IOException If the branch cannot be read or an unexpected HTTP status is returned.
+     * @see <a href="https://docs.github.com/en/rest/git/refs#get-a-reference">GET /repos/{owner}/{repo}/git/ref/{ref}</a>
+     */
     public String getHeadSHA(String branchName) throws IOException
     {
         String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/ref/heads/" + branchName;
@@ -48,6 +114,19 @@ public class GitHubBranchService
         connection.disconnect();
         return JsonParser.extractNestedValue(body, "object", "sha");
     }
+
+    /**
+     * Checks whether a branch with the provided name exists in the configured fork.
+     *
+     * <p>
+     * This performs a GET to the branch ref endpoint and interprets HTTP status:
+     * 200 -> exists, 404 -> does not exist. Any other status results in an IOException.
+     * </p>
+     *
+     * @param branchName The branch name to check (without refs/heads/).
+     * @return true if the branch exists in the fork, false if it does not (404).
+     * @throws IOException If an unexpected HTTP status is returned.
+     */
     public boolean branchExists(String branchName) throws IOException
     {
         String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/ref/heads/" + branchName;
@@ -59,6 +138,21 @@ public class GitHubBranchService
         if (status == 404) return false;
         throw new IOException("Unexpected status checking branch '" + branchName + "': " + status);
     }
+
+    /**
+     * Creates a new branch in the configured fork pointing to the specified base SHA.
+     *
+     * <p>
+     * This constructs a JSON payload of the form:
+     * {"ref":"refs/heads/{newBranchName}","sha":"{baseSha}"} and POSTs it to
+     * POST /repos/{forkOwner}/{repoName}/git/refs. A successful creation returns HTTP 201.
+     * </p>
+     *
+     * @param newBranchName The name of the branch to create (without refs/heads/).
+     * @param baseSha       The commit SHA the new branch should point to (typically head SHA of a base branch).
+     * @throws IOException If the creation fails or GitHub returns a status other than 201 Created.
+     * @see <a href="https://docs.github.com/en/rest/git/refs#create-a-reference">POST /repos/{owner}/{repo}/git/refs</a>
+     */
     public void createBranch(String newBranchName, String baseSha) throws IOException 
     {
         String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/refs";
@@ -74,13 +168,31 @@ public class GitHubBranchService
             throw new IOException("Branch creation failed for '" + newBranchName + "'. GitHub returned: " + status);
         }
     }
+
     /**
-     * The single method your SwingWorker calls after the fork is confirmed.
-     * Checks → creates if missing → returns the branch name ready to use.
+     * Ensures the requested branch exists in the user's fork: returns the branch name if it
+     * already exists; otherwise creates it from the default branch and returns the name.
      *
-     * @param upstreamOwner  "wikipathways"
-     * @param branchName     e.g. "pathway-update-WP5046"
-     * @return the branchName, confirmed to exist
+     * <p>
+     * Behavior:
+     * <ol>
+     *   <li>If branchExists(branchName) is true, simply returns branchName.</li>
+     *   <li>Otherwise, fetches the upstream default branch name via getDefaultBranch(upstreamOwner).</li>
+     *   <li>Reads the head SHA (via getHeadSHA) and creates the new branch in the fork.</li>
+     * </ol>
+     * </p>
+     *
+     * <p>
+     * Important note: getHeadSHA uses the configured forkOwner to fetch the SHA for the
+     * named branch. If the fork is not yet synchronized with upstream (for example, immediately
+     * after a fork request which is asynchronous on GitHub), callers should ensure the fork has
+     * been created and is up-to-date before invoking this method.
+     * </p>
+     *
+     * @param upstreamOwner The upstream repository owner (used to determine upstream default branch).
+     * @param branchName    The desired branch name to ensure exists in the fork.
+     * @return The branchName, guaranteed to exist (or an IOException is thrown).
+     * @throws IOException If any network/API call fails or returns an unexpected status.
      */
      public String ensureBranchExists(String upstreamOwner, String branchName) throws IOException 
      {
