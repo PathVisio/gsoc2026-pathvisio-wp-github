@@ -30,7 +30,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-
+import java.util.concurrent.CancellationException;
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
 
@@ -508,6 +508,10 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
                 {
                     callback.onFailure("Authentication cancelled.");
                 }
+            }
+			catch (CancellationException e)          // <-- ADD THIS BLOCK HERE
+            {
+                callback.onFailure("Authentication cancelled.");
             }
             catch (ExecutionException e)
             {
