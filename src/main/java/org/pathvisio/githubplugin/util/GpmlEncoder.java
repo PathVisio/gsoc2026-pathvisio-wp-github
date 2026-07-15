@@ -23,6 +23,7 @@ import java.util.Base64;
 
 import org.pathvisio.libgpml.io.ConverterException;
 import org.pathvisio.libgpml.model.GPMLFormat;
+import org.pathvisio.libgpml.model.Pathway;
 import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.util.HttpUtil;
 
@@ -87,16 +88,33 @@ public class GpmlEncoder {
 	 * @see #toUtf8Bytes(String)
 	 * @see #toBase64(byte[])
 	 */
-	public static String encodeToBase64(PathwayModel pathwayModel) throws Exception {
+	public static String encodeToBase64(PathwayModel pathwayModel, String githubUsername) throws Exception 
+	{
+		addAuthorIfAbsent(pathwayModel, githubUsername);
 		String gpmlString = readAsString(pathwayModel);
 		byte[] utf8Bytes = toUtf8Bytes(gpmlString);
 		return toBase64(utf8Bytes);
 	}
+	/**
+    * Adds the authenticated GitHub user as a pathway author if not already listed.
+    * Uses the GitHub username for both name and username fields for now.
+    */
+    private static void addAuthorIfAbsent(PathwayModel pathwayModel, String githubUsername)
+	{
+    Pathway pathway = pathwayModel.getPathway();
+    boolean alreadyListed = pathway.getAuthors().stream().anyMatch(a -> githubUsername.equals(a.getUsername()));
+    if (!alreadyListed) 
+	{
+        Pathway.Author author = pathway.addAuthor(githubUsername); // name field
+        author.setUsername(githubUsername);                        // username field
+        author.setOrder(pathway.getAuthors().size());
+    }
+}
 
 	/**
 	 * Converts a PathwayModel to its GPML XML string representation.
 	 * 
-	 * Serializes the provided PathwayModel object using the GPML 2013a format
+	 * Serializes the provided PathwayModel object using the GPML 2021 format
 	 * and returns the result as a UTF-8 encoded string. This intermediate format
 	 * is required before Base64 encoding for use with GitHub API requests.
 	 * 
@@ -108,7 +126,7 @@ public class GpmlEncoder {
 	private static String readAsString(PathwayModel pathwayModel) throws Exception {
 		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 		try {
-			GPMLFormat.GPML2013a.writeToXml(pathwayModel, outputStream, false);
+			GPMLFormat.GPML2021.writeToXml(pathwayModel, outputStream, false);
 			return outputStream.toString(StandardCharsets.UTF_8.name());
 		} catch (ConverterException e) {
 			throw new Exception("Error converting PathwayModel to GPML string", e);

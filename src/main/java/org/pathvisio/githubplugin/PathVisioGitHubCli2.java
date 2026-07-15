@@ -131,7 +131,7 @@ public class PathVisioGitHubCli2
             pathwayModel.readFromXml(gpmlFile, true);
             System.out.println("    -> Parsed pathway model, encoding to Base64...");
 
-            String base64Content = GpmlEncoder.encodeToBase64(pathwayModel);
+            String base64Content = GpmlEncoder.encodeToBase64(pathwayModel, username);
 
             String contentsApiUrl = String.format(
                     "https://api.github.com/repos/%s/%s/contents/%s",
