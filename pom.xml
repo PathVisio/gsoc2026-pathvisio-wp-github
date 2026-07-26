@@ -39,6 +39,17 @@
             <scope>test</scope>
         </dependency>
 
+    <dependency>
+        <groupId>org.pathvisio</groupId>
+        <artifactId>org.pathvisio.desktop</artifactId>
+        <version>4.0.0-local</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.pathvisio</groupId>
+        <artifactId>org.pathvisio.core</artifactId>
+        <version>4.0.0-local</version>
+     </dependency>
         <dependency>
             <groupId>org.pathvisio</groupId>
             <artifactId>org.pathvisio.libgpml</artifactId>
