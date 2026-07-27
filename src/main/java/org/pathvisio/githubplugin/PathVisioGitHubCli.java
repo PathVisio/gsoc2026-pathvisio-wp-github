@@ -2,9 +2,7 @@ package org.pathvisio.githubplugin;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
-import org.pathvisio.githubplugin.GitHubForkService;
-import org.pathvisio.githubplugin.GitHubBranchService;
-import org.pathvisio.githubplugin.GitHubAuthService;
+
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
