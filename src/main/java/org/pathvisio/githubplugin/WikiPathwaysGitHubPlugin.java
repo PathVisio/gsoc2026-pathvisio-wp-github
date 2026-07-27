@@ -17,7 +17,8 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
     private static final String MENU_KEY = "Plugins";
 
     @Override
-    public void init(PvDesktop desktop) {
+    public void init(PvDesktop desktop) 
+    {
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();
