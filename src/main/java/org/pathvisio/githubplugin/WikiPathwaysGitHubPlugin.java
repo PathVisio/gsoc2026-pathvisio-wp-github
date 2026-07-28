@@ -22,6 +22,7 @@ import org.pathvisio.githubplugin.service.GitHubAuthService;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import java.awt.event.ActionEvent;
+import org.pathvisio.githubplugin.controller.PluginController;
 
 /**
  * Main plugin class for integrating GitHub and WikiPathways functionality into PathVisio.

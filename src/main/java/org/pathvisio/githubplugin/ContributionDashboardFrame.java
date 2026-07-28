@@ -24,6 +24,8 @@ import javax.swing.JPanel;
 import javax.swing.BoxLayout;
 import javax.swing.BorderFactory;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
+import org.pathvisio.githubplugin.controller.PluginController;
+
 
 public class ContributionDashboardFrame extends JFrame 
 {

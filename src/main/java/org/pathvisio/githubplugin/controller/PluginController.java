@@ -14,8 +14,10 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  ******************************************************************************/
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.controller;
 import java.io.File;
+
+import org.pathvisio.githubplugin.service.GitHubForkService;
 import org.pathvisio.libgpml.model.PathwayModel;
 
 /**
