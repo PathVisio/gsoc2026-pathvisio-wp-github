@@ -15,7 +15,7 @@
  * the License.
  ******************************************************************************/
 
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.GUI;
 
 import org.pathvisio.desktop.PvDesktop;
 import javax.swing.JFrame;

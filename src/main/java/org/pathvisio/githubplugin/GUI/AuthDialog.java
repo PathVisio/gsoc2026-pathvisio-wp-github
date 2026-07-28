@@ -1,4 +1,4 @@
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.GUI;
 
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
