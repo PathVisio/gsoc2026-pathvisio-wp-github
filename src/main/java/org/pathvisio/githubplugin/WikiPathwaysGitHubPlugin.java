@@ -18,7 +18,7 @@ package org.pathvisio.githubplugin;
 
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.plugin.Plugin;
-
+import org.pathvisio.githubplugin.service.GitHubAuthService;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import java.awt.event.ActionEvent;

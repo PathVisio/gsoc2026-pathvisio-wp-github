@@ -20,6 +20,8 @@ import org.pathvisio.githubplugin.util.GpmlEncoder;
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
 import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.githubplugin.service.GitHubAuthService;
+import org.pathvisio.githubplugin.service.GitHubBranchService;
 
 import java.io.File;
 import java.io.IOException;

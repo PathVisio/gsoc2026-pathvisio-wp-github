@@ -1,7 +1,7 @@
 package org.pathvisio.githubplugin;
 
 import org.pathvisio.desktop.PvDesktop;
-
+import org.pathvisio.githubplugin.service.GitHubAuthService;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JButton;
