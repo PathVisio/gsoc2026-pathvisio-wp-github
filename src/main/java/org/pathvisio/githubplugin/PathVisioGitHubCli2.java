@@ -23,6 +23,8 @@ import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import org.pathvisio.githubplugin.service.GitHubBranchService;
 import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.service.GitHubPullService;
+import org.pathvisio.githubplugin.service.PullRequestResult;
 import org.pathvisio.githubplugin.service.GitHubCommitService;
 
 import java.io.File;
@@ -135,7 +137,7 @@ public class PathVisioGitHubCli2
             pathwayModel.readFromXml(gpmlFile, true);
             System.out.println("    -> Parsed pathway model, encoding to Base64...");
 
-            String base64Content = GpmlEncoder.encodeToBase64(pathwayModel, username);
+            String base64Content = GpmlEncoder.encodeToBase64(pathwayModel);
 
             String contentsApiUrl = String.format(
                     "https://api.github.com/repos/%s/%s/contents/%s",
