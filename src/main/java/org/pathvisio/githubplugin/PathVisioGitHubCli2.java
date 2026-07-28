@@ -22,6 +22,8 @@ import org.pathvisio.githubplugin.util.JsonParser;
 import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import org.pathvisio.githubplugin.service.GitHubBranchService;
+import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.service.GitHubCommitService;
 
 import java.io.File;
 import java.io.IOException;
