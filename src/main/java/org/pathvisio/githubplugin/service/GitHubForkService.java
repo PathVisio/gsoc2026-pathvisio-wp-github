@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  ******************************************************************************/
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.service;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
 import java.io.IOException;
@@ -105,6 +105,10 @@ public class GitHubForkService
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
         this.upstreamRepo = upstreamRepo;
+    }
+    public static String getUpstreamOwner() 
+    {
+        return UPSTREAM_OWNER;
     }
 
     /**
