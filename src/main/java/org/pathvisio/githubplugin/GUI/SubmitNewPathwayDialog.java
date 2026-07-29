@@ -116,7 +116,7 @@ public class SubmitNewPathwayDialog extends JDialog
             titleField.setText("");
         } else 
         {
-            titleField.setText(model.toString());
+            titleField.setText(model.getPathway().getTitle());
         }
     }
     private void startForkAndBranch() 
