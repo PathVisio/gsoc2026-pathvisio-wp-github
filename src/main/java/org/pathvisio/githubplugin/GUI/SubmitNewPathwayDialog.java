@@ -1,0 +1,160 @@
+package org.pathvisio.githubplugin.GUI;
+
+import org.pathvisio.githubplugin.controller.PluginController;
+import org.pathvisio.githubplugin.worker.ForkAndBranchWorker;
+import org.pathvisio.githubplugin.worker.ForkAndBranchWorker.ForkAndBranchCallback;
+import org.pathvisio.libgpml.model.PathwayModel;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+/**
+ * Dialog for submitting a brand-new pathway (no existing WikiPathways entry)
+ * to the WikiPathways GitHub repository. Corresponds to Fig 4.5.3.
+ *
+ * <p>On open, automatically runs {@link ForkAndBranchWorker} in the background
+ * to confirm the fork and branch are ready. The "Save Changes" button stays
+ * disabled until that succeeds, then commits via {@code CommitWorker}
+ * (Module 8 — not yet built; wiring is stubbed here).</p>
+ */
+public class SubmitNewPathwayDialog extends JDialog 
+{
+    private final PluginController controller;
+    private static final String UPSTREAM_REPO = "sandbox-wp-db";
+    private ForkAndBranchWorker forkAndBranchWorker;
+
+    private JTextField titleField;
+    private JTextField commitMessageField;
+    private JTextArea descriptionArea;
+    private JTextArea statusArea;
+    private JButton saveButton;
+    private JButton cancelButton;
+    private JTextField branchNameField;   
+
+    public SubmitNewPathwayDialog(Frame owner, PluginController controller) 
+    {
+        super(owner, "Submit Pathway", true);
+        this.controller = controller;
+
+        buildUI();
+        populateFromController();
+        startForkAndBranch();
+    }
+    private void buildUI() 
+    {
+        setLayout(new BorderLayout(10, 10));
+
+        JPanel formPanel = new JPanel();
+        formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
+
+        titleField = new JTextField();
+        commitMessageField = new JTextField();
+        branchNameField = new JTextField();
+        descriptionArea = new JTextArea(3, 30);
+        statusArea = new JTextArea(4, 30);
+        statusArea.setEditable(false);
+        statusArea.setText("Ready.");
+
+        formPanel.add(new JLabel("Pathway Title:"));
+        formPanel.add(titleField);
+        formPanel.add(new JLabel("Commit Message:"));
+        formPanel.add(commitMessageField);
+
+        formPanel.add(new JLabel("Branch Name (optional):"));
+        formPanel.add(branchNameField);
+
+        formPanel.add(new JLabel("Description:"));
+        formPanel.add(new JScrollPane(descriptionArea));
+
+        JPanel statusPanel = new JPanel(new BorderLayout());
+        statusPanel.setBorder(BorderFactory.createTitledBorder("Status"));
+        statusPanel.add(new JScrollPane(statusArea), BorderLayout.CENTER);
+
+        saveButton = new JButton("Save Changes");
+        cancelButton = new JButton("Cancel");
+        saveButton.setEnabled(false);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(saveButton);
+
+        cancelButton.addActionListener(e -> {
+        if (forkAndBranchWorker != null) {
+        forkAndBranchWorker.cancel(true);
+        }
+        dispose();
+        });
+        
+        setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (forkAndBranchWorker != null) {
+                    forkAndBranchWorker.cancel(true);
+                }
+                dispose();
+            }
+        });
+
+        // TODO (Module 8 dependency): CommitWorker does not exist yet.
+        // This action is intentionally left unimplemented rather than
+        // guessing CommitWorker's constructor shape.
+        saveButton.addActionListener(e -> { throw new UnsupportedOperationException("CommitWorker (Module 8) not yet implemented.");
+    });
+        add(formPanel, BorderLayout.NORTH);
+        add(statusPanel, BorderLayout.CENTER);
+        add(buttonPanel, BorderLayout.SOUTH);
+        pack();
+        setLocationRelativeTo(getOwner());
+    }
+    private void populateFromController() 
+    {
+        PathwayModel model = controller.getActivePathwayModel();
+        if (model == null) 
+        {
+            titleField.setText("");
+        } else 
+        {
+            titleField.setText(model.toString());
+        }
+    }
+    private void startForkAndBranch() 
+    {
+        forkAndBranchWorker = new ForkAndBranchWorker
+        (
+                controller.getAccessToken(),
+                controller.getAuthenticatedUsername(),
+                UPSTREAM_REPO, 
+                branchNameField.getText(),
+                new ForkAndBranchCallback() 
+                {
+                    @Override
+                    public void onStatusUpdate(String message) 
+                    {
+                        statusArea.append(message + "\n");
+                    }
+
+                    @Override
+                    public void onConflict() 
+                    {
+                        statusArea.append("Fork has diverged and could not be synced.\n");
+                    }
+                    @Override
+                    public void onSuccess(String branchName) 
+                    {
+                        controller.setConfirmedBranch(branchName);
+                        controller.setForkReady(true);
+                        statusArea.append("Branch ready: " + branchName + "\n");
+                        saveButton.setEnabled(true);
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) 
+                    {
+                        statusArea.append("Error: " + errorMessage + "\n");
+                    }
+                });
+        forkAndBranchWorker.execute(); 
+    }
+}
