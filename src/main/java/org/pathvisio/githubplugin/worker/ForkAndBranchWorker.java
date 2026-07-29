@@ -56,8 +56,15 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
         String resultBranchName;
 
         publish("Checking fork...");
-        forkService.ensureForkExists();
-        publish("Fork ready");
+        boolean forkReady = forkService.ensureForkExists();
+        if (forkReady) 
+        {
+            publish("Fork ready");
+        } 
+        else 
+        {
+            throw new IOException("Fork creation timed out before becoming ready.");
+        }
         publish("Syncing with upstream...");
         SyncResult syncResult = syncService.syncWithUpstreamMain();
         if (syncResult == SyncResult.CONFLICT) 
