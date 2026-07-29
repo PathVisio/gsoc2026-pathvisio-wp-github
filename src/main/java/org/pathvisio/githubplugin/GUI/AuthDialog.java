@@ -21,10 +21,11 @@ public class AuthDialog extends JDialog implements GitHubAuthService.AuthCallbac
     private JLabel userCodeLabel;
     private JLabel statusLabel;
     private JButton cancelButton;
-
+    private final PvDesktop desktop;
     public AuthDialog(PvDesktop desktop, PluginController controller, GitHubAuthService authService) 
     {
         super(desktop.getFrame(), "GitHub Authentication", true);
+        this.desktop = desktop;
         this.controller = controller;
         this.authService = authService;
 
@@ -84,6 +85,9 @@ public class AuthDialog extends JDialog implements GitHubAuthService.AuthCallbac
     {
         controller.setAccessToken(accessToken);
         this.dispose();
+        
+           ContributionDashboardFrame dashboard = new ContributionDashboardFrame(desktop, controller, authService);
+        dashboard.setVisible(true);
     }
 
     @Override

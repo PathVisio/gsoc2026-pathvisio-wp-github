@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  ******************************************************************************/
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.GUI;
 
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.plugin.Plugin;
@@ -133,35 +133,35 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
      * </ol>
      * </p>
      *
-     * <p>
-     * <strong>Note:</strong> The TODO comments indicate that {@code ContributionDashboardFrame}
-     * and {@code AuthDialog} are planned for future modules (Module 4 and Module 3, respectively)
-     * and are not yet implemented.
-     * </p>
      *
      * @param desktop the PathVisio desktop environment, used to register menu actions
      */
     @Override
-    public void init(PvDesktop desktop) 
+    public void init(PvDesktop desktop)
     {
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();
-
-        menuAction = new AbstractAction("WikiPathways GitHub Plugin") {
+ 
+        menuAction = new AbstractAction("WikiPathways GitHub Plugin") 
+        {
             @Override
-            public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent e) 
+            {
                 if (authService.isAuthenticated()) {
-                    // TODO: open ContributionDashboardFrame once built (Module 4)
+                    ContributionDashboardFrame dashboard =
+                        new ContributionDashboardFrame(desktop, controller, authService);
+                    dashboard.setVisible(true);
                 } else {
-                    // TODO: open AuthDialog once built (Module 3)
+                    AuthDialog authDialog =
+                        new AuthDialog(desktop, controller, authService);
+                    authDialog.setVisible(true);
                 }
             }
         };
-
+ 
         desktop.registerMenuAction(MENU_KEY, menuAction);
     }
-
     /**
      * Cleans up the plugin when PathVisio shuts down.
      *
