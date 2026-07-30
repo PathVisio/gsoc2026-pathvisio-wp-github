@@ -113,9 +113,18 @@ public class GitHubCommitService
         this.accessToken = accessToken;
     }
 
-    // =========================================================================
-    // Public API
-    // =========================================================================
+    /**
+     * Thrown when a commit fails due to a stale SHA (GitHub HTTP 409) — another
+     * contributor has committed to the same file since the caller last read it.
+     */
+    public static class StaleShaConflictException extends IOException 
+    {
+        public StaleShaConflictException(String message) 
+        {
+            super(message);
+        }
+    }
+
 
     /**
      * Commits a new or updated GPML file to a branch of the user's fork.
@@ -149,20 +158,15 @@ public class GitHubCommitService
      *         from the response), suitable for caching to avoid a subsequent
      *         GET call in the same session
      * @throws IllegalArgumentException if any required parameter is {@code null}
+     * @throws StaleShaConflictException if GitHub returns 409 Conflict — stale SHA, concurrent edit detected
      * @throws IOException if the HTTP call itself fails (network, timeout), or
-     *                     if GitHub returns a non-success status — e.g.:
+     *                     if GitHub returns another non-success status — e.g.:
      *                     <ul>
-     *                       <li>409 Conflict — stale SHA, concurrent edit detected</li>
      *                       <li>422 Unprocessable Entity — validation error</li>
      *                       <li>401 Unauthorized — token is revoked or invalid</li>
      *                     </ul>
      */
-    public String commitFile(
-            String path,
-            String branch,
-            String base64Content,
-            String sha,
-            String commitMessage) throws IOException
+   public String commitFile(String path, String branch, String base64Content, String sha, String commitMessage) throws IOException
     {
         if (path == null || branch == null)
         {
@@ -192,11 +196,9 @@ public class GitHubCommitService
             // GitHub returns 201 Created for new files and 200 OK for updates.
             if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_CREATED)
             {
-                // Surface stale-SHA conflicts with a clear message so the UI
-                // layer can show a merge-conflict log (proposal §6.2).
                 if (status == HttpURLConnection.HTTP_CONFLICT)
                 {
-                    throw new IOException(
+                    throw new StaleShaConflictException(
                             "Commit failed: SHA mismatch (HTTP 409). Another contributor may "
                             + "have edited this pathway. Please download the latest version and "
                             + "redo your changes. GitHub response: " + responseBody);
@@ -209,15 +211,9 @@ public class GitHubCommitService
         }
         finally
         {
-            // Always release the underlying TCP connection, consistent with
-            // GitHubBranchService and GpmlEncoder patterns in this project.
             connection.disconnect();
         }
     }
-
-    // =========================================================================
-    // Private helpers
-    // =========================================================================
 
     /**
      * Writes the JSON payload to the connection's output stream.
