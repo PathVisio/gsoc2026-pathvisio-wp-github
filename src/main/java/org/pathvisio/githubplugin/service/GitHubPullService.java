@@ -122,9 +122,13 @@ public class GitHubPullService
         this.accessToken   = accessToken;
     }
 
-    // =========================================================================
-    // Public API
-    // =========================================================================
+    public static class PullRequestValidationException extends IOException 
+    {
+        public PullRequestValidationException(String message) 
+        {
+            super(message);
+        }
+    }
 
     /**
      * Opens a pull request from a branch on the user's fork against a branch
@@ -224,13 +228,7 @@ public class GitHubPullService
             connection.disconnect();
         }
     }
-    public static class PullRequestValidationException extends IOException 
-    {
-        public PullRequestValidationException(String message) 
-        {
-            super(message);
-        }
-    }
+   
 
     /**
      * Writes the JSON payload to the connection's output stream.
