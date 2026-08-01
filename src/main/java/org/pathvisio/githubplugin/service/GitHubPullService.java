@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  ******************************************************************************/
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.service;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
@@ -204,7 +204,7 @@ public class GitHubPullService
             {
                 if (status == 422)
                 {
-                    throw new IOException(
+                    throw new PullRequestValidationException(
                             "Pull request creation failed (HTTP 422). This usually means "
                             + "there are no commits between '" + head + "' and '" + baseBranch
                             + "', or a pull request already exists for this branch pair. "
@@ -224,10 +224,13 @@ public class GitHubPullService
             connection.disconnect();
         }
     }
-
-    // =========================================================================
-    // Private helpers
-    // =========================================================================
+    public static class PullRequestValidationException extends IOException 
+    {
+        public PullRequestValidationException(String message) 
+        {
+            super(message);
+        }
+    }
 
     /**
      * Writes the JSON payload to the connection's output stream.
