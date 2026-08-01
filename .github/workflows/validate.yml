@@ -1,0 +1,259 @@
+# Validates WikiPathways pathway content (GPML) on every pull request that
+# touches a .gpml file. Does nothing for PRs that only change plugin Java code.
+#
+# Two-job pipeline:
+#   1. structural-validation  – general SPARQL-based structural checks
+#   2. metadata-validation    – VoID/metadata completeness checks (runs only
+#                               if job 1 passes)
+#
+# Tool chain (all confirmed from source code):
+#   GPML → WPRDF : org.wikipathways.curator.CreateRDF  (from wikipathways.curator-1-SNAPSHOT.jar)
+#                  Signature: CreateRDF <gpmlFile> <outFile> <revision>
+#                  WPID parsed internally as: gpmlFile.substring(5, gpmlFile.indexOf('.'))
+#                  → input path MUST be prefixed with exactly 5 chars, e.g. "gpml/WP1234.gpml"
+#   Validation   : WikiPathwaysCurator (standalone Maven project, cloned at runtime)
+
+name: WikiPathways Pathway Validation
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**.gpml'
+
+jobs:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1 – Structural Validation
+  # Runs all WikiPathwaysCurator SPARQL tests EXCEPT those tagged "void" or
+  # "outdated" or "allonly" (default exclusions from the curator's pom.xml).
+  # ─────────────────────────────────────────────────────────────────────────────
+  structural-validation:
+    name: Structural Validation
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ── 1. Checkout with enough history for git diff ──────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2          # need HEAD and HEAD~1 for git diff
+
+      # ── 2. Detect which .gpml file changed and extract its WPID ───────────
+      - name: Detect changed pathway
+        id: pathway
+        run: |
+          # Get the first changed .gpml file in this PR
+          GPML_FILE=$(git diff --name-only HEAD~1 HEAD -- '*.gpml' | head -1)
+
+          if [ -z "$GPML_FILE" ]; then
+            echo "No .gpml file found in diff — skipping validation."
+            echo "found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Extract WPID from filename  e.g. "pathways/WP1234.gpml" → "WP1234"
+          WPID=$(basename "$GPML_FILE" .gpml | grep -oE 'WP[0-9]+')
+
+          echo "gpml_file=$GPML_FILE" >> $GITHUB_OUTPUT
+          echo "wpid=$WPID"           >> $GITHUB_OUTPUT
+          echo "found=true"           >> $GITHUB_OUTPUT
+
+          echo "Detected pathway: $WPID  ($GPML_FILE)"
+
+      # ── 3. Java 11 (matches WikiPathwaysCurator's own CI) ─────────────────
+      - name: Set up Java 11
+        if: steps.pathway.outputs.found == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      # ── 4. Download GPML2RDF converter JARs (from curation-template release-7)
+      #       These are the exact URLs the wikipathways-curation-template Makefile
+      #       uses — confirmed source, not guessed.
+      - name: Download GPML2RDF JARs
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          mkdir -p libs rdf
+
+          RELEASE_BASE="https://github.com/wikipathways/wikipathways-curation-template/releases/download/release-7"
+
+          wget -q -O libs/GPML2RDF-3.0.0-SNAPSHOT.jar \
+            "${RELEASE_BASE}/GPML2RDF-3.0.0-SNAPSHOT.jar"
+
+          wget -q -O libs/jena-arq-4.8.0.jar \
+            "https://repo1.maven.org/maven2/org/apache/jena/jena-arq/4.8.0/jena-arq-4.8.0.jar"
+
+          wget -q -O libs/slf4j-simple-1.7.32.jar \
+            "https://search.maven.org/remotecontent?filepath=org/slf4j/slf4j-simple/1.7.32/slf4j-simple-1.7.32.jar"
+
+      # ── 5. Convert GPML → WPRDF (.ttl) ────────────────────────────────────
+      #
+      #  CONFIRMED from CreateRDF.java source (in wikipathways-curation-template):
+      #    main(args): args[0]=gpmlFile, args[1]=outFile, args[2]=revision
+      #    WPID is parsed internally as: gpmlFile.substring(5, gpmlFile.indexOf('.'))
+      #    → The path MUST be prefixed with exactly 5 characters before the WPID.
+      #      We create a "gpml/" symlink to satisfy this constraint.
+      #
+      #  Revision: WikiPathways revision is not available locally. We pass "0"
+      #  as a placeholder — it affects only the dcterms:identifier triple in the
+      #  output RDF, not the structural content that WikiPathwaysCurator tests.
+      - name: Convert GPML to WPRDF
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          # Arrange input path so CreateRDF's substring(5) WPID parsing works:
+          # input path must look like "gpml/WP1234.gpml" (5-char prefix)
+          mkdir -p gpml
+          WPID="${{ steps.pathway.outputs.wpid }}"
+          cp "${{ steps.pathway.outputs.gpml_file }}" "gpml/${WPID}.gpml"
+
+          # Output file: rdf/WP1234.ttl
+          java -cp "libs/*" \
+            org.wikipathways.curator.CreateRDF \
+            "gpml/${WPID}.gpml" \
+            "rdf/${WPID}.ttl" \
+            "0"
+
+      # ── 6. Clone WikiPathwaysCurator (standalone Maven project) ───────────
+      #       Shallow clone — we only need the current state.
+      - name: Clone WikiPathwaysCurator
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          git clone --depth 1 \
+            https://github.com/wikipathways/WikiPathwaysCurator.git \
+            WikiPathwaysCurator
+
+      # ── 7. Run structural SPARQL tests ────────────────────────────────────
+      #       -DOPSWPRDF   = directory containing the .ttl file(s)
+      #       -DSUBSETPREFIX = WPID prefix so only WP1234*.ttl is loaded
+      #       No -Djunit5.groups flag → curator's default exclusions apply
+      #       (excludes: outdated, allonly; runs everything else)
+      - name: Run structural validation (WikiPathwaysCurator)
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          cd WikiPathwaysCurator
+          mvn install \
+            -DOPSWPRDF="${GITHUB_WORKSPACE}/rdf" \
+            -DSUBSETPREFIX="${{ steps.pathway.outputs.wpid }}"
+
+      # ── 8. Upload Surefire test report ────────────────────────────────────
+      #       if: always() ensures the report is available even when tests fail —
+      #       that's exactly when you need it most.
+      - name: Upload structural test report
+        if: steps.pathway.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-validation-report-${{ steps.pathway.outputs.wpid }}
+          path: WikiPathwaysCurator/target/surefire-reports/
+          retention-days: 14
+
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2 – Metadata / VoID Validation
+  # Runs only the JUnit 5 tests tagged @Tag("void") in WikiPathwaysCurator.
+  # These check metadata completeness (title, organism, description) and the
+  # VoID descriptor — matching the -Djunit5.groups=void flag Tina's .yml used.
+  #
+  # Only runs if Job 1 passed: no point checking metadata on broken RDF.
+  # ─────────────────────────────────────────────────────────────────────────────
+  metadata-validation:
+    name: Metadata / VoID Validation
+    runs-on: ubuntu-latest
+    needs: structural-validation      # waits for Job 1; skips if Job 1 failed
+
+    steps:
+
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # ── 2. Detect changed pathway (same logic as Job 1) ───────────────────
+      #       Jobs run on separate runners — outputs from Job 1 are not shared.
+      - name: Detect changed pathway
+        id: pathway
+        run: |
+          GPML_FILE=$(git diff --name-only HEAD~1 HEAD -- '*.gpml' | head -1)
+
+          if [ -z "$GPML_FILE" ]; then
+            echo "found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          WPID=$(basename "$GPML_FILE" .gpml | grep -oE 'WP[0-9]+')
+
+          echo "gpml_file=$GPML_FILE" >> $GITHUB_OUTPUT
+          echo "wpid=$WPID"           >> $GITHUB_OUTPUT
+          echo "found=true"           >> $GITHUB_OUTPUT
+
+      # ── 3. Java 11 ────────────────────────────────────────────────────────
+      - name: Set up Java 11
+        if: steps.pathway.outputs.found == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      # ── 4. Download GPML2RDF JARs ─────────────────────────────────────────
+      - name: Download GPML2RDF JARs
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          mkdir -p libs rdf
+
+          RELEASE_BASE="https://github.com/wikipathways/wikipathways-curation-template/releases/download/release-7"
+
+          wget -q -O libs/GPML2RDF-3.0.0-SNAPSHOT.jar \
+            "${RELEASE_BASE}/GPML2RDF-3.0.0-SNAPSHOT.jar"
+
+          wget -q -O libs/jena-arq-4.8.0.jar \
+            "https://repo1.maven.org/maven2/org/apache/jena/jena-arq/4.8.0/jena-arq-4.8.0.jar"
+
+          wget -q -O libs/slf4j-simple-1.7.32.jar \
+            "https://search.maven.org/remotecontent?filepath=org/slf4j/slf4j-simple/1.7.32/slf4j-simple-1.7.32.jar"
+
+      # ── 5. Convert GPML → WPRDF ───────────────────────────────────────────
+      - name: Convert GPML to WPRDF
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          mkdir -p gpml
+          WPID="${{ steps.pathway.outputs.wpid }}"
+          cp "${{ steps.pathway.outputs.gpml_file }}" "gpml/${WPID}.gpml"
+
+          java -cp "libs/*" \
+            org.wikipathways.curator.CreateRDF \
+            "gpml/${WPID}.gpml" \
+            "rdf/${WPID}.ttl" \
+            "0"
+
+      # ── 6. Clone WikiPathwaysCurator ──────────────────────────────────────
+      - name: Clone WikiPathwaysCurator
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          git clone --depth 1 \
+            https://github.com/wikipathways/WikiPathwaysCurator.git \
+            WikiPathwaysCurator
+
+      # ── 7. Run VoID / metadata-specific tests ─────────────────────────────
+      #       -Djunit5.groups=void  is the confirmed flag from the curator's
+      #       pom.xml <junit5.groups> property, passed to Surefire's groups
+      #       configuration. Runs ONLY @Tag("void") tests.
+      - name: Run metadata validation (WikiPathwaysCurator, void group)
+        if: steps.pathway.outputs.found == 'true'
+        run: |
+          cd WikiPathwaysCurator
+          mvn install \
+            -DOPSWPRDF="${GITHUB_WORKSPACE}/rdf" \
+            -DSUBSETPREFIX="${{ steps.pathway.outputs.wpid }}" \
+            -Djunit5.groups=void
+
+      # ── 8. Upload VoID test report ────────────────────────────────────────
+      - name: Upload metadata test report
+        if: steps.pathway.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadata-validation-report-${{ steps.pathway.outputs.wpid }}
+          path: WikiPathwaysCurator/target/surefire-reports/
+          retention-days: 14
