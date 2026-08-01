@@ -32,15 +32,22 @@ public class PullRequestWorker extends SwingWorker<PullRequestResult, String>
         this.body = body;
         this.callback = callback;
     }
-    @Override
+   @Override
     protected PullRequestResult doInBackground() throws Exception 
     {
         GitHubPullService pullService = new GitHubPullService(upstreamOwner, repoName, forkOwner, accessToken);
 
-        publish("Creating pull request...");
+        publish("Preparing pull request...");
+        publish("  head: " + forkOwner + ":" + headBranch);
+        publish("  base: " + baseBranch);
+        publish("Sending request to GitHub...");
+
         PullRequestResult result = pullService.createPullRequest(title, headBranch, baseBranch, body);
 
-        publish("Pull request created");
+        publish("Pull request created: #" + result.getNumber());
+        publish("  " + result.getHtmlUrl());
+        publish("  state: " + result.getState());
+
         return result;
     }
     @Override
