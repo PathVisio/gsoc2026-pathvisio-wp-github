@@ -103,24 +103,40 @@
             </plugin>
 
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>${maven.jar.version}</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>org.pathvisio.githubplugin.GitHubPlugin</mainClass>
-                        </manifest>
-                        <manifestEntries>
-                            <Plugin-Name>GitHub Integration Plugin</Plugin-Name>
-                            <Plugin-Version>1.0.0</Plugin-Version>
-                            <Plugin-Author>Snehashree Prusty</Plugin-Author>
-                            <Plugin-Description>Direct GitHub integration for WikiPathways pathway submission</Plugin-Description>
-                        </manifestEntries>
-                    </archive>
-                    <finalName>githubplugin</finalName>
-                </configuration>
-            </plugin>
+    <groupId>org.apache.felix</groupId>
+    <artifactId>maven-bundle-plugin</artifactId>
+    <version>5.1.9</version>
+    <executions>
+        <execution>
+            <id>generate-osgi-manifest</id>
+            <goals>
+                <goal>manifest</goal>
+            </goals>
+            <configuration>
+                <instructions>
+                    <Bundle-SymbolicName>org.pathvisio.githubplugin</Bundle-SymbolicName>
+                    <Bundle-Name>PathVisio GitHub Integration Plugin</Bundle-Name>
+                    <Bundle-Version>${project.version}</Bundle-Version>
+                    <Bundle-Vendor>Snehashree Prusty</Bundle-Vendor>
+                    <Bundle-Description>Direct GitHub integration for WikiPathways pathway submission</Bundle-Description>
+                    <Require-Bundle>org.pathvisio.desktop;bundle-version="4.0.0"</Require-Bundle>
+                </instructions>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-jar-plugin</artifactId>
+    <version>${maven.jar.version}</version>
+    <configuration>
+        <archive>
+            <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+        </archive>
+        <finalName>githubplugin</finalName>
+    </configuration>
+</plugin>
         </plugins>
     </build>
     <profiles>
