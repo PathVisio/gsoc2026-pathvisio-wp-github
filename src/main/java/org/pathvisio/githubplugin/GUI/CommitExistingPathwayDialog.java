@@ -228,6 +228,59 @@ public class CommitExistingPathwayDialog extends JDialog
                 });
         forkAndBranchWorker.execute();
     }
+
+    // start commit
+
+    private void startCommit() 
+    {
+        saveButton.setEnabled(false);
+
+        commitWorker = new CommitWorker(controller.getAccessToken(),
+            controller.getAuthenticatedUsername(),
+            UPSTREAM_REPO,
+            confirmedBranch,
+            repoPath,
+            controller.getActivePathwayModel(),
+            resolvedSha,
+            commitTitleField.getText(),
+            new CommitCallback() 
+            {
+                @Override
+                public void onStatusUpdate(String message) 
+                {
+                    statusArea.append(message + "\n");
+                }
+
+                @Override
+                public void onConflict() 
+                {
+                    statusArea.append(
+                        "Error: this file has changed on GitHub since it was "
+                        + "loaded. Please close this dialog and try again to "
+                        + "pick up the latest version.\n");
+                    saveButton.setEnabled(true);
+                }
+
+                @Override
+                public void onSuccess(String newSha) 
+                {
+                    resolvedSha = newSha;
+                    statusArea.append("Commit successful. New SHA: " + newSha + "\n");
+                    saveButton.setText("Committed");
+                    cancelButton.setText("Close");
+                }
+
+                @Override
+                public void onFailure(String errorMessage) 
+                {
+                    statusArea.append("Error: " + errorMessage + "\n");
+                    saveButton.setEnabled(true);
+                }
+            });
+        commitWorker.execute();
+    }
+
+
     private void startShaLookup() 
     {
         if (repoPath == null) 

@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  ******************************************************************************/
-package org.pathvisio.githubplugin;
+package org.pathvisio.githubplugin.service;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;

@@ -2,7 +2,13 @@ package org.pathvisio.githubplugin;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
 import org.pathvisio.githubplugin.util.JsonParser;
+import org.pathvisio.githubplugin.service.GitHubBranchService;
+import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.service.GitHubAuthService;
 
+import org.pathvisio.githubplugin.service.GitHubAuthService;
+import org.pathvisio.githubplugin.service.GitHubBranchService;
+import org.pathvisio.githubplugin.service.GitHubForkSyncService; // Note: Ensure this matches your actual filename!
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
