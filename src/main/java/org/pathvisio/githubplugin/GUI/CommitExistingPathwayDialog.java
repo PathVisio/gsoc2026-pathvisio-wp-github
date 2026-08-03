@@ -19,7 +19,7 @@ import org.pathvisio.githubplugin.worker.CommitWorker.CommitCallback;
 
 /**
  * Dialog for committing changes to an existing pathway already present in
- * the WikiPathways repository. Corresponds to Fig 4.5.4.
+ * the WikiPathways repository.
  *
  * <p>Sequence: {@link ForkAndBranchWorker} confirms fork/branch readiness,
  * then on success a {@link ShaLookupWorker} resolves the existing file's
@@ -160,54 +160,7 @@ public class CommitExistingPathwayDialog extends JDialog
         }
     }
 
-    private void startCommit() 
-    {
-        saveButton.setEnabled(false);
-
-        commitWorker = new CommitWorker(controller.getAccessToken(),
-            controller.getAuthenticatedUsername(),
-            UPSTREAM_REPO,
-            confirmedBranch,
-            repoPath,
-            controller.getActivePathwayModel(),
-            resolvedSha,
-            commitTitleField.getText(),
-            new CommitCallback() 
-            {
-                @Override
-                public void onStatusUpdate(String message) 
-                {
-                    statusArea.append(message + "\n");
-                }
-
-                @Override
-                public void onConflict() 
-                {
-                    statusArea.append(
-                        "Error: this file has changed on GitHub since it was "
-                        + "loaded. Please close this dialog and try again to "
-                        + "pick up the latest version.\n");
-                    saveButton.setEnabled(true);
-                }
-
-                @Override
-                public void onSuccess(String newSha) 
-                {
-                    resolvedSha = newSha;
-                    statusArea.append("Commit successful. New SHA: " + newSha + "\n");
-                    saveButton.setText("Committed");
-                    cancelButton.setText("Close");
-                }
-
-                @Override
-                public void onFailure(String errorMessage) 
-                {
-                    statusArea.append("Error: " + errorMessage + "\n");
-                    saveButton.setEnabled(true);
-                }
-            });
-        commitWorker.execute();
-    }
+    
      private void populateFromController() 
      {
         PathwayModel model = controller.getActivePathwayModel();
@@ -240,8 +193,7 @@ public class CommitExistingPathwayDialog extends JDialog
         return "pathways/" + baseName + "/" + fileName;
     }
 
-       private void startForkAndBranch() 
-       {
+     private void startForkAndBranch() {
         forkAndBranchWorker = new ForkAndBranchWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
@@ -249,42 +201,33 @@ public class CommitExistingPathwayDialog extends JDialog
                 branchNameField.getText(),
                 new ForkAndBranchCallback() {
                     @Override
-                    public void onStatusUpdate(String message) 
-                    {
+                    public void onStatusUpdate(String message) {
                         statusArea.append(message + "\n");
                     }
 
-                @Override
-                public void onConflict() 
-                {
-                    statusArea.append(
-                        "Error: this file has changed on GitHub since it was "
-                        + "loaded. Please close this dialog and try again to "
-                        + "pick up the latest version.\n");
-                    // saveButton intentionally stays disabled — resolvedSha is now known stale;
-                    // the only valid recovery is closing and reopening for a new SHA lookup.
-                }
-
-                @Override
-                public void onSuccess(String newSha) 
-                {
-                    resolvedSha = newSha;
-                    statusArea.append("Commit successful. New SHA: " + newSha + "\n");
-                    saveButton.setText("Committed");
-                    saveButton.setEnabled(false); // Prevent re-clicking after success
-                    cancelButton.setText("Close");
-                }
+                    @Override
+                    public void onConflict() {
+                        statusArea.append("Fork has diverged and could not be synced.\n");
+                        shaStatusLabel.setText("SHA Status: Blocked (fork conflict)");
+                    }
 
                     @Override
-                    public void onFailure(String errorMessage) 
-                    {
+                    public void onSuccess(String branchName) {
+                        confirmedBranch = branchName;
+                        controller.setConfirmedBranch(branchName);
+                        controller.setForkReady(true);
+                        statusArea.append("Branch ready: " + branchName + "\n");
+                        startShaLookup();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) {
                         statusArea.append("Error: " + errorMessage + "\n");
                         shaStatusLabel.setText("SHA Status: Unavailable (fork/branch error)");
                     }
                 });
         forkAndBranchWorker.execute();
     }
-
     private void startShaLookup() 
     {
         if (repoPath == null) 
