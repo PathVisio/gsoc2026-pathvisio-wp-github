@@ -139,6 +139,7 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
     @Override
     public void init(PvDesktop desktop)
     {
+        System.out.println("WikiPathwaysGitHubPlugin.init() called - plugin loaded successfully");
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();

@@ -86,7 +86,7 @@ public class AuthDialog extends JDialog implements GitHubAuthService.AuthCallbac
         controller.setAccessToken(accessToken);
         this.dispose();
         
-           ContributionDashboardFrame dashboard = new ContributionDashboardFrame(desktop, controller, authService);
+        ContributionDashboardFrame dashboard = new ContributionDashboardFrame(desktop, controller, authService);
         dashboard.setVisible(true);
     }
 

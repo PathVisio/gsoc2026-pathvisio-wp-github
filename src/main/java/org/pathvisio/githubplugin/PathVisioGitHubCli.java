@@ -8,7 +8,7 @@ import org.pathvisio.githubplugin.service.GitHubAuthService;
 
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import org.pathvisio.githubplugin.service.GitHubBranchService;
-import org.pathvisio.githubplugin.service.GitHubForkSyncService; // Note: Ensure this matches your actual filename!
+import org.pathvisio.githubplugin.service.GitHubForkSyncService;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;

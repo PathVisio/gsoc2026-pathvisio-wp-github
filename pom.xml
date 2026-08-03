@@ -63,6 +63,7 @@
             <scope>test</scope>
         </dependency>
 
+
         <!-- mockito-junit-jupiter: integrates Mockito with JUnit 5 via @ExtendWith(MockitoExtension.class).
              mockConstruction() (used to mock new URL(...)) is built into mockito-core in Mockito 5.x —
              no separate mockito-inline artifact needed. -->
@@ -71,6 +72,13 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>${mockito.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.framework</artifactId>
+            <version>1.8.0</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -120,6 +128,7 @@
                     <Bundle-Vendor>Snehashree Prusty</Bundle-Vendor>
                     <Bundle-Description>Direct GitHub integration for WikiPathways pathway submission</Bundle-Description>
                     <Require-Bundle>org.pathvisio.desktop;bundle-version="4.0.0"</Require-Bundle>
+                    <Bundle-Activator>org.pathvisio.githubplugin.GUI.Activator</Bundle-Activator>
                 </instructions>
             </configuration>
         </execution>
