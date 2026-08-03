@@ -22,16 +22,11 @@ import org.pathvisio.libgpml.model.PathwayModel;
 import javax.swing.JFrame;
 import javax.swing.JButton;
 import javax.swing.JPanel;
-import javax.swing.JOptionPane;
+
 import javax.swing.BoxLayout;
 import javax.swing.BorderFactory;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import org.pathvisio.githubplugin.controller.PluginController;
-
-import org.pathvisio.githubplugin.GUI.SubmitNewPathwayDialog;
-import org.pathvisio.githubplugin.GUI.CommitExistingPathwayDialog;
-import org.pathvisio.githubplugin.GUI.SubmitForReviewDialog;
-
 
 /**
  * The central hub of the plugin's contribution workflow.
@@ -50,10 +45,9 @@ import org.pathvisio.githubplugin.GUI.SubmitForReviewDialog;
  * </p>
  *
  * <p>
- * Before opening the first two dialogs, this frame reads the currently active
- * {@link PathwayModel} from PathVisio's engine and the active GPML file from
- * the {@link PluginController}, then guards against the case where no pathway
- * is open. {@link SubmitForReviewDialog} does not require an active pathway —
+ * This frame assumes that an active {@link PathwayModel} and GPML file are 
+ * already loaded (typically enforced by the UI before this dashboard can be 
+ * opened). {@link SubmitForReviewDialog} does not require an active pathway —
  * it guards internally against a missing branch.
  * </p>
  *
@@ -84,6 +78,10 @@ public class ContributionDashboardFrame extends JFrame
     // Builds and lays out all Swing components for this frame.
     private void buildUI()
     {
+        submitNewButton = new JButton("Submit new pathway");
+        commitExistingButton = new JButton("Commit to existing pathway");
+        submitForReviewButton = new JButton("Submit for review");
+
         submitNewButton.addActionListener(e -> {
         SubmitNewPathwayDialog dialog = new SubmitNewPathwayDialog(desktop.getFrame(), controller);
         dialog.setVisible(true);
@@ -111,69 +109,5 @@ public class ContributionDashboardFrame extends JFrame
         this.add(buttonPanel);
         this.setSize(320, 220);
         this.setLocationRelativeTo(desktop.getFrame());
-    }
-
-    /**
-     * Reads the active pathway model from PathVisio's engine and the active
-     * GPML file from the controller, then stores them back onto the controller
-     * so that the commit dialogs can read them via {@code populateFromController()}.
-     *
-     * <p>
-     * Both the model and the file must be non-null for a commit dialog to work.
-     * If either is missing, this method shows a {@link JOptionPane} error to the
-     * user and returns {@code false} — the caller must not open the dialog.
-     * </p>
-     *
-     * <p>
-     * The model is sourced live from
-     * {@code desktop.getSwingEngine().getEngine().getActivePathwayModel()} so it
-     * always reflects what is currently open in the PathVisio canvas. The file is
-     * read from {@code controller.getActiveGpmlFile()}, which is populated by the
-     * {@code ApplicationEvent.PATHWAY_OPENED} listener registered in
-     * {@link WikiPathwaysGitHubPlugin#init(PvDesktop)}.
-     * </p>
-     *
-     * @return {@code true} if both model and file are available and have been
-     *         loaded into the controller; {@code false} if the user should be
-     *         asked to open a GPML file first
-     */
-    private boolean loadActivePathwayIntoController()
-    {
-        // Read the live model from PathVisio's engine — this is always current.
-        PathwayModel model =
-            desktop.getSwingEngine().getEngine().getActivePathwayModel();
-
-        if (model == null)
-        {
-            JOptionPane.showMessageDialog(
-                this,
-                "No pathway is currently open in PathVisio.\n"
-                    + "Please open a GPML file before submitting.",
-                "No Pathway Open",
-                JOptionPane.WARNING_MESSAGE
-            );
-            return false;
-        }
-
-        // The active file is tracked by the plugin controller via the
-        // ApplicationEvent.PATHWAY_OPENED listener in WikiPathwaysGitHubPlugin.
-        // If it is null here, the listener was not fired (e.g. the file was
-        // already open before the plugin was initialized this session).
-        if (controller.getActiveGpmlFile() == null)
-        {
-            JOptionPane.showMessageDialog(
-                this,
-                "Could not determine the GPML file path for the current pathway.\n"
-                    + "Please close and reopen the file, then try again.",
-                "File Not Resolved",
-                JOptionPane.WARNING_MESSAGE
-            );
-            return false;
-        }
-
-        // Push the live model into the controller so the dialog's
-        // populateFromController() reads an up-to-date copy.
-        controller.setActivePathwayModel(model);
-        return true;
     }
 }
