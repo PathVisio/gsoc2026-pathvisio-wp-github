@@ -143,16 +143,51 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();
- 
-        menuAction = new AbstractAction("WikiPathways GitHub Plugin") 
+ menuAction = new AbstractAction("WikiPathways GitHub Plugin") 
         {
             @Override
             public void actionPerformed(ActionEvent e) 
             {
                 if (authService.isAuthenticated()) {
-                    ContributionDashboardFrame dashboard =
-                        new ContributionDashboardFrame(desktop, controller, authService);
-                    dashboard.setVisible(true);
+                    authService.startAuthentication(new GitHubAuthService.AuthCallback()
+                    {
+                        @Override
+                        public void onUserCodeReceived(String userCode, int expiresIn)
+                        {
+                            // Not expected on the cached-token path — a valid
+                            // cached token skips the device-code flow entirely.
+                            // No-op defensively rather than throwing.
+                        }
+
+                        @Override
+                        public void onStatusUpdate(String message)
+                        {
+                            // Same as above — no visible UI on this path to update.
+                        }
+
+                        @Override
+                        public void onSuccess(String accessToken, String username)
+                        {
+                            controller.setAccessToken(accessToken);
+                            controller.setAuthenticatedUsername(username);
+                            ContributionDashboardFrame dashboard =
+                                new ContributionDashboardFrame(desktop, controller, authService);
+                            dashboard.setVisible(true);
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage)
+                        {
+                            // The cached token turned out to be invalid/revoked
+                            // on network validation. startAuthentication() has
+                            // already cleared it internally, so falling back to
+                            // AuthDialog here correctly re-runs the full device
+                            // flow rather than looping back to a broken token.
+                            AuthDialog authDialog =
+                                new AuthDialog(desktop, controller, authService);
+                            authDialog.setVisible(true);
+                        }
+                    });
                 } else {
                     AuthDialog authDialog =
                         new AuthDialog(desktop, controller, authService);
