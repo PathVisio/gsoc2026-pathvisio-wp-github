@@ -97,7 +97,7 @@ private static String authenticate()
                 System.out.println("    -> " + message);
             }
             @Override
-            public void onSuccess(String accessToken) 
+            public void onSuccess(String accessToken, String username) 
             {
                 tokenRef.set(accessToken);
                 latch.countDown();
