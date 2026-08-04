@@ -142,11 +142,8 @@ public class GitHubAuthService {
 	 * 
 	 * May be null if no polling is currently in progress.
 	 */
-	private SwingWorker<String, String> pollingWorker;
+	private SwingWorker<AuthResult, String> pollingWorker;
 
-	// ================================================================================
-	// Inner Classes
-	// ================================================================================
 
 	/**
 	 * Immutable data class representing the response from GitHub's device code endpoint.
@@ -154,16 +151,19 @@ public class GitHubAuthService {
 	 * Contains all necessary information for the client to guide the user through the
 	 * authorization process and to poll for the access token.
 	 */
-	static class DeviceCodeResponse {
+	static class DeviceCodeResponse
+	{
 		private String deviceCode;
 		private String userCode;
 		private String verificationUri;
 		private int expiresIn;
 		private int interval;
 
+	
+
 		/**
 		 * Constructs a DeviceCodeResponse with all required fields.
-		 * 
+		 *
 		 * @param deviceCode the device code used to poll for token (40 alphanumeric characters)
 		 * @param userCode the user-friendly code to display for manual entry at github.com/login/device
 		 * @param verificationUri the URI where the user enters the device code
@@ -225,6 +225,48 @@ public class GitHubAuthService {
 	}
 
 	/**
+	 * Immutable holder pairing a validated access token with the
+	 * authenticated user's GitHub username.
+	 *
+	 * <p>Used internally to carry both values out of a single background
+	 * worker's {@code doInBackground()}, since {@link SwingWorker}'s
+	 * generic result type only carries one object.</p>
+	 */
+	static class AuthResult 
+	{
+		private final String token;
+		private final String username;
+
+		/**
+		 * Constructs an AuthResult pairing a token with its owner's username.
+		 *
+		 * @param token the valid GitHub access token
+		 * @param username the GitHub username of the token's owner
+		 */
+		public AuthResult(String token, String username) {
+			this.token = token;
+			this.username = username;
+		}
+
+		/**
+		 * Returns the access token.
+		 *
+		 * @return the access token string
+		 */
+		public String getToken() {
+			return token;
+		}
+
+		/**
+		 * Returns the authenticated user's GitHub username.
+		 *
+		 * @return the username string
+		 */
+		public String getUsername() {
+			return username;
+		}
+	}
+	/**
 	 * Callback interface for receiving authentication flow events.
 	 * 
 	 * All callback methods are invoked on the Event Dispatch Thread (EDT),
@@ -257,11 +299,14 @@ public class GitHubAuthService {
 		 * Called when authentication succeeds and a valid access token is obtained.
 		 * 
 		 * The access token has been validated and stored. The token can be used
-		 * for subsequent GitHub API requests.
+		 * for subsequent GitHub API requests. The username has been fetched
+		 * from GitHub's /user endpoint and is ready to populate any shared
+		 * plugin state (e.g. PluginController) that depends on it.
 		 * 
 		 * @param accessToken the valid GitHub access token
+		 * @param username the GitHub username of the authenticated user
 		 */
-		void onSuccess(String accessToken);
+		void onSuccess(String accessToken, String username);
 
 		/**
 		 * Called when authentication fails or is cancelled.
@@ -296,28 +341,57 @@ public class GitHubAuthService {
 	 * @return {@code true} if the token is valid, {@code false} otherwise
 	 */
 	private boolean isTokenValid(String token) {
-        HttpURLConnection conn = null; 
-        try {
-           
+        HttpURLConnection conn = null;
+        try
+		{
             conn = HttpUtil.openAuthenticatedConnection("https://api.github.com/user", "GET", token); 
             int responseCode = conn.getResponseCode();
             return responseCode == HttpURLConnection.HTTP_OK;
-        } catch (Exception e) {
+        }
+		catch (Exception e)
+		{
             return false;
-        } finally {
+        }
+		finally
+		{
             if (conn != null) {
                 conn.disconnect();
             }
         }
     }
 	
+	/**
+	 * Fetches the authenticated user's GitHub username from GitHub's
+	 * /user endpoint.
+	 * 
+	 * <p><strong>Note:</strong> This method should be called from a
+	 * background thread to avoid blocking the UI.</p>
+	 *
+	 * @param token a valid access token
+	 * @return the GitHub username (the "login" field)
+	 * @throws IOException if the request fails or returns a non-200 status
+	 */
+	private String fetchAuthenticatedUsername(String token) throws IOException 
+	{
+		String endpoint = "https://api.github.com/user";
+		HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", token);
+		int status = connection.getResponseCode();
+		if (status != 200) {
+			connection.disconnect();
+			throw new IOException("Failed to fetch authenticated user. Status: " + status);
+		}
+		String body = HttpUtil.readResponseBody(connection);
+		connection.disconnect();
+		return JsonParser.extractValue(body, "login");
+	}
 
 	/**
 	 * Requests device and user codes from GitHub's device code endpoint.
-	 * 
+	 *
 	 * This is the first step of the device code OAuth flow. GitHub returns a device code
 	 * (used for polling) and a user code (displayed to the user).
-	 * 
+	 * <p><strong>Note:</strong> This method should be called from a background thread
+	 * to avoid blocking the UI.</p>
 	 * @return a {@link DeviceCodeResponse} containing the device code, user code, and metadata
 	 * @throws IOException if the HTTP request fails or the response is invalid
 	 */
@@ -470,11 +544,11 @@ public class GitHubAuthService {
  * @param expiresIn the device code validity period in seconds
  * @return a configured but unstarted {@link SwingWorker}
  */
-private SwingWorker<String, String> createPollingWorker(AuthCallback callback, int expiresIn)
+private SwingWorker<AuthResult, String> createPollingWorker(AuthCallback callback, int expiresIn)
 {
-   return new SwingWorker<String, String>() {
+   return new SwingWorker<AuthResult, String>() {
     @Override
-    protected String doInBackground() throws Exception {
+    protected AuthResult doInBackground() throws Exception {
 
         long expiryTime = System.currentTimeMillis() + expiresIn * 1000L;
         while (!isCancelled())
@@ -484,7 +558,11 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
                 throw new IOException("Code for authentication has expired. Please try again.");
             }
             String token = pollForAccessToken();
-            if (token != null) return token;
+            if (token != null)
+            {
+                String username = fetchAuthenticatedUsername(token);
+                return new AuthResult(token, username);
+            }
             publish("Waiting for user authorization...");
             Thread.sleep(interval*1000L);
         }
@@ -498,11 +576,11 @@ private SwingWorker<String, String> createPollingWorker(AuthCallback callback, i
         @Override
         protected void done() {
             try {
-                String token = get();
-                if (token != null)
+                AuthResult result = get();
+                if (result != null)
                 {
-                TokenManager.saveToken(token);
-                callback.onSuccess(token);
+                TokenManager.saveToken(result.getToken());
+                callback.onSuccess(result.getToken(), result.getUsername());
                 }
                 else
                 {
@@ -686,17 +764,23 @@ public boolean isAuthenticated()
 		String existingToken = TokenManager.getToken();
 		if (existingToken != null) {
 			// Needs to be validated with GitHub API, must be done in background thread
-			SwingWorker<Boolean, Void> validationWorker = new SwingWorker<Boolean, Void>() {
+			SwingWorker<AuthResult, Void> validationWorker = new SwingWorker<AuthResult, Void>() {
 				@Override
-				protected Boolean doInBackground() throws Exception {
-					return isTokenValid(existingToken);
+				protected AuthResult doInBackground() throws Exception {
+					if (isTokenValid(existingToken)) {
+						String username = fetchAuthenticatedUsername(existingToken);
+						return new AuthResult(existingToken, username);
+					} else {
+						return null;
+					}
 				}
 
 				@Override
 				protected void done() {
 					try {
-						if (get()) {
-							callback.onSuccess(existingToken);
+						AuthResult result = get();
+						if (result != null) {
+							callback.onSuccess(result.getToken(), result.getUsername());
 						} else {
 							TokenManager.clearToken();
 							beginDeviceAuthFlow(callback);
