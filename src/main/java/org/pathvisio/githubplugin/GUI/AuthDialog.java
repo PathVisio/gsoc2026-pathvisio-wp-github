@@ -81,9 +81,10 @@ public class AuthDialog extends JDialog implements GitHubAuthService.AuthCallbac
     }
 
     @Override
-    public void onSuccess(String accessToken) 
+    public void onSuccess(String accessToken, String username) 
     {
         controller.setAccessToken(accessToken);
+        controller.setAuthenticatedUsername(username);
         this.dispose();
         
         ContributionDashboardFrame dashboard = new ContributionDashboardFrame(desktop, controller, authService);
