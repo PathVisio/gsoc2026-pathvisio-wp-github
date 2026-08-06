@@ -112,6 +112,11 @@ import java.io.File;
         });
 
         saveButton.addActionListener(e -> {
+        if (repoPath == null)
+        {
+            String sanitizedTitle = sanitizeTitle(titleField.getText());
+            repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
+        }
         commitWorker = new CommitWorker(
             controller.getAccessToken(),
             controller.getAuthenticatedUsername(),
@@ -178,6 +183,22 @@ import java.io.File;
                 descriptionArea.setText(description);
             }
         }
+    }
+
+    /**
+     * Sanitizes a free-text pathway title into a safe repo path segment.
+     * Falls back to a timestamp-based placeholder if the title is empty
+     * or contains no usable characters after sanitization.
+     */
+    private String sanitizeTitle(String title)
+    {
+        String sanitized = title == null ? "" : title.trim().replaceAll("\\s+", "_");
+        sanitized = sanitized.replaceAll("[^A-Za-z0-9_-]", "");
+        if (sanitized.isEmpty())
+        {
+            sanitized = "untitled-pathway-" + System.currentTimeMillis();
+        }
+        return sanitized;
     }
     /**
      * Builds the repo-relative path for the active GPML file, matching
