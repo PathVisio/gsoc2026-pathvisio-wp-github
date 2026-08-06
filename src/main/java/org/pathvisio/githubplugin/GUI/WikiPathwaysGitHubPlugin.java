@@ -18,6 +18,10 @@ package org.pathvisio.githubplugin.GUI;
 
 import org.pathvisio.desktop.PvDesktop;
 import org.pathvisio.desktop.plugin.Plugin;
+import org.pathvisio.core.Engine;
+import org.pathvisio.core.ApplicationEvent;
+import org.pathvisio.libgpml.model.PathwayModel;
+
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -107,6 +111,18 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
      * Displays authentication or dashboard UI based on login status.
      */
     private Action menuAction;
+    
+    /**
+     * Reference to the PathVisio engine, which provides access to the core
+     * pathway model and application events.
+     */
+    private Engine engine;
+
+    /**
+     * Listener for pathway-related application events.
+     * Updates the plugin state when the active pathway model changes.
+     */
+    private Engine.ApplicationEventListener pathwayListener;
 
     /**
      * The menu key under which the plugin action is registered.
@@ -139,11 +155,52 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
     @Override
     public void init(PvDesktop desktop)
     {
+        
         System.out.println("WikiPathwaysGitHubPlugin.init() called - plugin loaded successfully");
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();
- menuAction = new AbstractAction("WikiPathways GitHub Plugin") 
+
+        this.engine = desktop.getSwingEngine().getEngine();
+
+        // One-time snapshot: covers the case where a pathway is already open
+        // in PathVisio before this plugin's init() runs.
+        PathwayModel currentModel = engine.getActivePathwayModel();
+        if (currentModel != null)
+        {
+            controller.setActivePathwayModel(currentModel);
+            controller.setActiveGpmlFile(currentModel.getSourceFile());
+        }
+
+        // Live listener: keeps controller in sync with whatever becomes
+        // active after init() — opening a file, creating a new one, saving.
+        this.pathwayListener = new Engine.ApplicationEventListener()
+        {
+            @Override
+            public void applicationEvent(ApplicationEvent event)
+            {
+                switch (event.getType())
+                {
+                    case PATHWAY_OPENED:
+                    case PATHWAY_NEW:
+                    case PATHWAY_SAVE:
+                        PathwayModel updatedModel = engine.getActivePathwayModel();
+                        controller.setActivePathwayModel(updatedModel);
+                        controller.setActiveGpmlFile(
+                            updatedModel != null ? updatedModel.getSourceFile() : null);
+                        break;
+                    case APPLICATION_CLOSE:
+                        controller.setActivePathwayModel(null);
+                        controller.setActiveGpmlFile(null);
+                        break;
+                    default:
+                        // VPATHWAY_* events not relevant to this wiring — ignored.
+                        break;
+                }
+            }
+        };
+        engine.addApplicationEventListener(this.pathwayListener);
+        menuAction = new AbstractAction("WikiPathways GitHub Plugin")
         {
             @Override
             public void actionPerformed(ActionEvent e) 
@@ -215,5 +272,6 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
     public void done() 
     {
         desktop.unregisterMenuAction(MENU_KEY, menuAction);
+        engine.removeApplicationEventListener(pathwayListener);
     }
 }
