@@ -32,7 +32,6 @@ import java.io.File;
     private JTextArea statusArea;
     private JButton saveButton;
     private JButton cancelButton;
-    private JTextField branchNameField;
 
     private CommitWorker commitWorker;
     private String confirmedBranch;
@@ -56,7 +55,6 @@ import java.io.File;
 
         titleField = new JTextField();
         commitMessageField = new JTextField();
-        branchNameField = new JTextField();
         descriptionArea = new JTextArea(3, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
@@ -67,8 +65,6 @@ import java.io.File;
         formPanel.add(new JLabel("Commit Message:"));
         formPanel.add(commitMessageField);
 
-        formPanel.add(new JLabel("Branch Name (optional):"));
-        formPanel.add(branchNameField);
 
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
@@ -220,7 +216,7 @@ import java.io.File;
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
                 UPSTREAM_REPO, 
-                branchNameField.getText(),
+                null,
                 new ForkAndBranchCallback() 
                 {
                     @Override
