@@ -4,7 +4,10 @@ import org.pathvisio.githubplugin.controller.PluginController;
 import org.pathvisio.githubplugin.worker.CommitWorker;
 import org.pathvisio.githubplugin.worker.ForkAndBranchWorker;
 import org.pathvisio.githubplugin.worker.ForkAndBranchWorker.ForkAndBranchCallback;
+import org.pathvisio.githubplugin.worker.PullRequestWorker;
 import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.service.PullRequestResult;
 
 import javax.swing.*;
 import java.awt.*;
@@ -20,10 +23,12 @@ import java.io.File;
  * to confirm the fork and branch are ready. The "Save Changes" button stays
  * disabled until that succeeds, then commits via {@link CommitWorker} with
  * {@code sha = null} (create flow, since this is always a new file).</p>
- */ class SubmitNewPathwayDialog extends JDialog 
+ */ 
+class SubmitNewPathwayDialog extends JDialog 
 {
     private final PluginController controller;
     private static final String UPSTREAM_REPO = "sandbox-wp-db";
+    private static final String BASE_BRANCH = "main";
     private ForkAndBranchWorker forkAndBranchWorker;
 
     private JTextField titleField;
@@ -46,6 +51,7 @@ import java.io.File;
         populateFromController();
         startForkAndBranch();
     }
+
     private void buildUI() 
     {
         setLayout(new BorderLayout(10, 10));
@@ -65,7 +71,6 @@ import java.io.File;
         formPanel.add(new JLabel("Commit Message:"));
         formPanel.add(commitMessageField);
 
-
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
 
@@ -82,13 +87,15 @@ import java.io.File;
         buttonPanel.add(saveButton);
 
         cancelButton.addActionListener(e -> {
-        if (forkAndBranchWorker != null) 
-        {
-            forkAndBranchWorker.cancel(true);
-        }
-        if (commitWorker != null) 
-        commitWorker.cancel(true);
-        dispose();
+            if (forkAndBranchWorker != null) 
+            {
+                forkAndBranchWorker.cancel(true);
+            }
+            if (commitWorker != null) 
+            {
+                commitWorker.cancel(true);
+            }
+            dispose();
         });
         
         setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
@@ -108,51 +115,103 @@ import java.io.File;
         });
 
         saveButton.addActionListener(e -> {
-        if (repoPath == null)
-        {
-            String sanitizedTitle = sanitizeTitle(titleField.getText());
-            repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
-        }
-        commitWorker = new CommitWorker(
-            controller.getAccessToken(),
-            controller.getAuthenticatedUsername(),
-            UPSTREAM_REPO,
-            confirmedBranch,
-            repoPath,
-            controller.getActivePathwayModel(),
-            null, // sha — always null, this is the create flow
-            commitMessageField.getText(),
-            new CommitWorker.CommitCallback() {
-                @Override
-                public void onStatusUpdate(String message) 
-                {
-                    statusArea.append(message + "\n");
+            if (repoPath == null)
+            {
+                String sanitizedTitle = sanitizeTitle(titleField.getText());
+                repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
+            }
+            commitWorker = new CommitWorker(
+                controller.getAccessToken(),
+                controller.getAuthenticatedUsername(),
+                UPSTREAM_REPO,
+                confirmedBranch,
+                repoPath,
+                controller.getActivePathwayModel(),
+                null, // sha — always null, this is the create flow
+                commitMessageField.getText(),
+                new CommitWorker.CommitCallback() {
+                    @Override
+                    public void onStatusUpdate(String message) 
+                    {
+                        statusArea.append(message + "\n");
+                    }
+                    
+                    @Override
+                    public void onConflict() 
+                    {
+                        statusArea.append("Conflict: file was modified concurrently.\n");
+                    }
+                    
+                    @Override
+                    public void onSuccess(String newSha) 
+                    {
+                        statusArea.append("Commit successful. New SHA: " + newSha + "\n");
+                        String prTitle = "Contribution: " + titleField.getText();
+                        String prBody = descriptionArea.getText();
+                        
+                        PullRequestWorker pullRequestWorker = new PullRequestWorker(
+                            controller.getAccessToken(),
+                            GitHubForkService.getUpstreamOwner(),
+                            UPSTREAM_REPO,
+                            controller.getAuthenticatedUsername(),
+                            confirmedBranch,
+                            BASE_BRANCH,
+                            prTitle,
+                            prBody,
+                            new PullRequestWorker.PullRequestCallback()
+                            {
+                                @Override
+                                public void onStatusUpdate(String message) 
+                                {
+                                    statusArea.append(message + "\n");
+                                }
+
+                                @Override
+                                public void onSuccess(PullRequestResult result) 
+                                {
+                                    statusArea.append("Pull request #" + result.getNumber() + " created.\n");
+                                    statusArea.append(result.getHtmlUrl() + "\n");
+                                    saveButton.setEnabled(false);
+                                }
+                            
+                                @Override
+                                public void onValidationFailure(String message) 
+                                {
+                                    statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
+                                    saveButton.setEnabled(false);
+                                }
+
+                                @Override
+                                public void onFailure(String errorMessage)
+                                {
+                                    statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + errorMessage + "\n");
+                                    saveButton.setEnabled(false);
+                                }
+                            }
+                        );
+                        
+                        
+                        pullRequestWorker.execute();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) 
+                    {
+                        statusArea.append("Commit failed: " + errorMessage + "\n");
+                    }
                 }
-                @Override
-                public void onConflict() 
-                {
-                    statusArea.append("Conflict: file was modified concurrently.\n");
-                }
-                @Override
-                public void onSuccess(String newSha) 
-                {
-                    statusArea.append("Commit successful. New SHA: " + newSha + "\n");
-                    saveButton.setEnabled(false);
-                }
-                @Override
-                public void onFailure(String errorMessage) 
-                {
-                    statusArea.append("Commit failed: " + errorMessage + "\n");
-                }
-            });
-    commitWorker.execute();
-    });
+            );
+            
+            commitWorker.execute();
+        });
+
         add(formPanel, BorderLayout.NORTH);
         add(statusPanel, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
         pack();
         setLocationRelativeTo(getOwner());
     }
+
     private void populateFromController() 
     {
         File gpmlFile = controller.getActiveGpmlFile();
@@ -196,6 +255,7 @@ import java.io.File;
         }
         return sanitized;
     }
+
     /**
      * Builds the repo-relative path for the active GPML file, matching
      * PathVisioGitHubCli2's convention: "pathways/<baseName>/<fileName>".
@@ -213,39 +273,41 @@ import java.io.File;
     {
         forkAndBranchWorker = new ForkAndBranchWorker
         (
-                controller.getAccessToken(),
-                controller.getAuthenticatedUsername(),
-                UPSTREAM_REPO, 
-                null,
-                new ForkAndBranchCallback() 
+            controller.getAccessToken(),
+            controller.getAuthenticatedUsername(),
+            UPSTREAM_REPO, 
+            null,
+            new ForkAndBranchCallback() 
+            {
+                @Override
+                public void onStatusUpdate(String message) 
                 {
-                    @Override
-                    public void onStatusUpdate(String message) 
-                    {
-                        statusArea.append(message + "\n");
-                    }
+                    statusArea.append(message + "\n");
+                }
 
-                    @Override
-                    public void onConflict() 
-                    {
-                        statusArea.append("Fork has diverged and could not be synced.\n");
-                    }
-                    @Override
-                    public void onSuccess(String branchName) 
-                    {
-                        confirmedBranch = branchName;
-                        controller.setConfirmedBranch(branchName);
-                        controller.setForkReady(true);
-                        statusArea.append("Branch ready: " + branchName + "\n");
-                        saveButton.setEnabled(true);
-                    }
+                @Override
+                public void onConflict() 
+                {
+                    statusArea.append("Fork has diverged and could not be synced.\n");
+                }
 
-                    @Override
-                    public void onFailure(String errorMessage) 
-                    {
-                        statusArea.append("Error: " + errorMessage + "\n");
-                    }
-                });
+                @Override
+                public void onSuccess(String branchName) 
+                {
+                    confirmedBranch = branchName;
+                    controller.setConfirmedBranch(branchName);
+                    controller.setForkReady(true);
+                    statusArea.append("Branch ready: " + branchName + "\n");
+                    saveButton.setEnabled(true);
+                }
+
+                @Override
+                public void onFailure(String errorMessage) 
+                {
+                    statusArea.append("Error: " + errorMessage + "\n");
+                }
+            }
+        );
         forkAndBranchWorker.execute(); 
     }
 }
