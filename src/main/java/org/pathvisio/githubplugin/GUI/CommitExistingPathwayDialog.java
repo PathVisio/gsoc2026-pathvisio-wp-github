@@ -44,7 +44,7 @@ public class CommitExistingPathwayDialog extends JDialog
     private JLabel activePathwayLabel;
     private JLabel targetRepoLabel;
     private JLabel shaStatusLabel;
-    private JTextField branchNameField;
+   
     private JTextField commitTitleField;
     private JTextArea descriptionArea;
     private JTextArea statusArea;
@@ -81,15 +81,14 @@ public class CommitExistingPathwayDialog extends JDialog
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-        branchNameField = new JTextField();
+       
         commitTitleField = new JTextField();
         descriptionArea = new JTextArea(3, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
         statusArea.setText("Ready.");
 
-        formPanel.add(new JLabel("Branch Name (optional):"));
-        formPanel.add(branchNameField);
+        
         formPanel.add(new JLabel("Commit Title:"));
         formPanel.add(commitTitleField);
         formPanel.add(new JLabel("Description:"));
@@ -198,7 +197,7 @@ public class CommitExistingPathwayDialog extends JDialog
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
                 UPSTREAM_REPO,
-                branchNameField.getText(),
+                null,
                 new ForkAndBranchCallback() {
                     @Override
                     public void onStatusUpdate(String message) {
@@ -324,4 +323,3 @@ public class CommitExistingPathwayDialog extends JDialog
         shaLookupWorker.execute();
     }
 }
-
