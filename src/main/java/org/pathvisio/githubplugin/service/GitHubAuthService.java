@@ -587,7 +587,7 @@ private SwingWorker<AuthResult, String> createPollingWorker(AuthCallback callbac
                     callback.onFailure("Authentication cancelled.");
                 }
             }
-			catch (CancellationException e)          // <-- ADD THIS BLOCK HERE
+			catch (CancellationException e)          
             {
                 callback.onFailure("Authentication cancelled.");
             }
