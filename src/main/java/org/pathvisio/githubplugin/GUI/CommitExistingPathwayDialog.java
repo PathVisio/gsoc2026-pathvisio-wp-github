@@ -7,6 +7,9 @@ import org.pathvisio.githubplugin.worker.ForkAndBranchWorker.ForkAndBranchCallba
 import org.pathvisio.githubplugin.worker.ShaLookupWorker;
 import org.pathvisio.githubplugin.worker.ShaLookupWorker.ShaLookupCallback;
 import org.pathvisio.libgpml.model.PathwayModel;
+import org.pathvisio.githubplugin.worker.PullRequestWorker;
+import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.service.PullRequestResult;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,6 +20,7 @@ import java.io.File;
 import org.pathvisio.githubplugin.worker.CommitWorker;
 import org.pathvisio.githubplugin.worker.CommitWorker.CommitCallback;
 
+
 /**
  * Dialog for committing changes to an existing pathway already present in
  * the WikiPathways repository.
@@ -25,12 +29,12 @@ import org.pathvisio.githubplugin.worker.CommitWorker.CommitCallback;
  * then on success a {@link ShaLookupWorker} resolves the existing file's
  * SHA at the derived repo path. Save Changes stays disabled until both
  * complete. Commits via {@code CommitWorker} (Module 8, complete) with the
- * resolved SHA — this is the update flow, unlike Module 6's create flow.</p>
+ * resolved SHA — this is the update flow, unlike create flow.</p>
  */
-public class CommitExistingPathwayDialog extends JDialog 
+public class CommitExistingPathwayDialog extends JDialog
 {
     private static final String UPSTREAM_REPO = "sandbox-wp-db";
-
+    private static final String BASE_BRANCH = "main";
     private final PluginController controller;
 
     private ForkAndBranchWorker forkAndBranchWorker;
@@ -40,6 +44,7 @@ public class CommitExistingPathwayDialog extends JDialog
     private String confirmedBranch;
     private String resolvedSha;
     private String repoPath;
+    private boolean prInProgress = false;
 
     private JLabel activePathwayLabel;
     private JLabel targetRepoLabel;
@@ -118,6 +123,10 @@ public class CommitExistingPathwayDialog extends JDialog
         southPanel.add(buttonPanel);
 
         cancelButton.addActionListener(e -> {
+        if (prInProgress)
+        {
+            return;
+        }
         cancelRunningWorkers();
         dispose();
         });
@@ -128,6 +137,10 @@ public class CommitExistingPathwayDialog extends JDialog
          @Override
             public void windowClosing(WindowEvent e) 
             {
+                 if (prInProgress)
+                {
+                    return;
+                }
                 cancelRunningWorkers();
                 dispose();
             }
@@ -266,9 +279,60 @@ public class CommitExistingPathwayDialog extends JDialog
                     resolvedSha = newSha;
                     statusArea.append("Commit successful. New SHA: " + newSha + "\n");
                     saveButton.setText("Committed");
-                    cancelButton.setText("Close");
-                }
+                    
+                    String prTitle = "Contribution: " + commitTitleField.getText();
+                    String prBody = descriptionArea.getText();
 
+                    PullRequestWorker pullRequestWorker = new PullRequestWorker(
+                        controller.getAccessToken(),
+                        GitHubForkService.getUpstreamOwner(),
+                        UPSTREAM_REPO,
+                        controller.getAuthenticatedUsername(),
+                        confirmedBranch,
+                        BASE_BRANCH,
+                        prTitle,
+                        prBody,
+                        new PullRequestWorker.PullRequestCallback()
+                        {
+                            @Override
+                            public void onStatusUpdate(String message) 
+                            {
+                                statusArea.append(message + "\n");
+                            }
+
+                            @Override
+                            public void onSuccess(PullRequestResult result) 
+                            {
+                                statusArea.append("Pull request #" + result.getNumber() + " created.\n");
+                                statusArea.append(result.getHtmlUrl() + "\n");
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                            }
+                            
+                            @Override
+                            public void onValidationFailure(String message) 
+                            {
+                                statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                            }
+
+                            @Override
+                            public void onFailure(String errorMessage)
+                            {
+                                statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + errorMessage + "\n");
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                            }
+                        }
+                    );
+                    prInProgress = true;
+                    cancelButton.setEnabled(false);
+                    pullRequestWorker.execute();
+                }
                 @Override
                 public void onFailure(String errorMessage) 
                 {
@@ -278,8 +342,7 @@ public class CommitExistingPathwayDialog extends JDialog
             });
         commitWorker.execute();
     }
-
-
+    
     private void startShaLookup() 
     {
         if (repoPath == null) 
