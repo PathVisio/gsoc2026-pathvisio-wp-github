@@ -40,9 +40,10 @@ class SubmitNewPathwayDialog extends JDialog
 
     private CommitWorker commitWorker;
     private String confirmedBranch;
-    private String repoPath;    
+    private String repoPath;
+    private boolean prInProgress = false;
 
-    public SubmitNewPathwayDialog(Frame owner, PluginController controller) 
+    public SubmitNewPathwayDialog(Frame owner, PluginController controller)
     {
         super(owner, "Submit Pathway", true);
         this.controller = controller;
@@ -87,11 +88,15 @@ class SubmitNewPathwayDialog extends JDialog
         buttonPanel.add(saveButton);
 
         cancelButton.addActionListener(e -> {
-            if (forkAndBranchWorker != null) 
+            if (prInProgress)
+            {
+                return;
+            }
+            if (forkAndBranchWorker != null)
             {
                 forkAndBranchWorker.cancel(true);
             }
-            if (commitWorker != null) 
+            if (commitWorker != null)
             {
                 commitWorker.cancel(true);
             }
@@ -103,10 +108,15 @@ class SubmitNewPathwayDialog extends JDialog
             @Override
             public void windowClosing(WindowEvent e) 
             {
-                if (forkAndBranchWorker != null) {
+                if (prInProgress)
+                {
+                    return;
+                }
+                if (forkAndBranchWorker != null) 
+                {
                     forkAndBranchWorker.cancel(true);
                 }
-                if (commitWorker != null) 
+                if (commitWorker != null)
                 {
                     commitWorker.cancel(true);
                 }
@@ -172,6 +182,9 @@ class SubmitNewPathwayDialog extends JDialog
                                     statusArea.append("Pull request #" + result.getNumber() + " created.\n");
                                     statusArea.append(result.getHtmlUrl() + "\n");
                                     saveButton.setEnabled(false);
+                                    prInProgress = false;
+                                    cancelButton.setEnabled(true);
+                                    cancelButton.setText("Close");
                                 }
                             
                                 @Override
@@ -179,6 +192,9 @@ class SubmitNewPathwayDialog extends JDialog
                                 {
                                     statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
                                     saveButton.setEnabled(false);
+                                    prInProgress = false;
+                                    cancelButton.setEnabled(true);
+                                    cancelButton.setText("Close");
                                 }
 
                                 @Override
@@ -186,11 +202,15 @@ class SubmitNewPathwayDialog extends JDialog
                                 {
                                     statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + errorMessage + "\n");
                                     saveButton.setEnabled(false);
+                                    prInProgress = false;
+                                    cancelButton.setEnabled(true);
+                                    cancelButton.setText("Close");
                                 }
                             }
                         );
                         
-                        
+                        prInProgress = true;
+                        cancelButton.setEnabled(false);
                         pullRequestWorker.execute();
                     }
 
