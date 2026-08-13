@@ -32,28 +32,26 @@ import org.pathvisio.githubplugin.controller.PluginController;
  * The central hub of the plugin's contribution workflow.
  *
  * <p>
- * Presents three actions to an authenticated user:
+ * Presents two actions to an authenticated user, each of which now performs
+ * a commit followed immediately by pull request creation as one operation:
  * <ol>
- *   <li><strong>Submit new pathway</strong> — opens {@link SubmitNewPathwayDialog}
- *       to commit a brand-new GPML file to WikiPathways (Module 6).</li>
- *   <li><strong>Commit to existing pathway</strong> — opens
+ *   <li><strong>Submit new pathway (Commit + PR)</strong> — opens
+ *       {@link SubmitNewPathwayDialog} to commit a brand-new GPML file to
+ *       WikiPathways and open a pull request for it.</li>
+ *   <li><strong>Submit existing pathway</strong> — opens
  *       {@link CommitExistingPathwayDialog} to update a file already in the
- *       repository (Module 7).</li>
- *   <li><strong>Submit for review</strong> — opens {@link SubmitForReviewDialog}
- *       to open a GitHub pull request from the user's branch (Module 9).</li>
+ *       repository and open a pull request for the change.</li>
  * </ol>
  * </p>
  *
  * <p>
  * This frame assumes that an active {@link PathwayModel} and GPML file are 
  * already loaded (typically enforced by the UI before this dashboard can be 
- * opened). {@link SubmitForReviewDialog} does not require an active pathway —
- * it guards internally against a missing branch.
+ * opened).
  * </p>
  *
  * @see SubmitNewPathwayDialog
  * @see CommitExistingPathwayDialog
- * @see SubmitForReviewDialog
  */
 public class ContributionDashboardFrame extends JFrame
 {
@@ -63,7 +61,7 @@ public class ContributionDashboardFrame extends JFrame
 
     private JButton submitNewButton;
     private JButton commitExistingButton;
-    private JButton submitForReviewButton;
+   
 
     public ContributionDashboardFrame(PvDesktop desktop, PluginController controller, GitHubAuthService authService)
     {
@@ -78,9 +76,8 @@ public class ContributionDashboardFrame extends JFrame
     // Builds and lays out all Swing components for this frame.
     private void buildUI()
     {
-        submitNewButton = new JButton("Submit new pathway");
-        commitExistingButton = new JButton("Commit to existing pathway");
-        submitForReviewButton = new JButton("Submit for review");
+        submitNewButton = new JButton("Submit changes to new pathway");
+        commitExistingButton = new JButton("Submit changes to existing pathway");
 
         submitNewButton.addActionListener(e -> {
         SubmitNewPathwayDialog dialog = new SubmitNewPathwayDialog(desktop.getFrame(), controller);
@@ -91,12 +88,6 @@ public class ContributionDashboardFrame extends JFrame
         CommitExistingPathwayDialog dialog = new CommitExistingPathwayDialog(desktop.getFrame(), controller);
         dialog.setVisible(true);
         });
-
-        
-        submitForReviewButton.addActionListener(e -> {
-        SubmitForReviewDialog dialog = new SubmitForReviewDialog(desktop.getFrame(), controller);
-        dialog.setVisible(true);
-        });
        
 
         JPanel buttonPanel = new JPanel();
@@ -104,10 +95,10 @@ public class ContributionDashboardFrame extends JFrame
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         buttonPanel.add(submitNewButton);
         buttonPanel.add(commitExistingButton);
-        buttonPanel.add(submitForReviewButton);
+
 
         this.add(buttonPanel);
-        this.setSize(320, 220);
+        this.setSize(360, 160);
         this.setLocationRelativeTo(desktop.getFrame());
     }
 }
