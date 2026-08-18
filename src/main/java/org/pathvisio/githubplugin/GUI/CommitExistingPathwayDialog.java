@@ -51,12 +51,22 @@ public class CommitExistingPathwayDialog extends JDialog
     private JLabel targetRepoLabel;
     private JLabel shaStatusLabel;
    
-    private JTextField commitTitleField;
+    // (1) REMOVED — private JTextField commitTitleField; no longer needed,
+    // commit title is now auto-generated from wpidField
     private JTextField wpidField; 
     private JTextArea descriptionArea;
     private JTextArea statusArea;
     private JButton saveButton;
     private JButton cancelButton;
+
+    private JCheckBox dataNodesCheckBox;
+    private JCheckBox identifiersCheckBox;
+    private JCheckBox interactionsCheckBox;
+    private JCheckBox titleDescriptionCheckBox;
+    private JCheckBox referencesCheckBox;
+    private JCheckBox ontologyTagsCheckBox;
+    private JCheckBox layoutOnlyCheckBox;
+    private JCheckBox otherCheckBox;
     
 
     public CommitExistingPathwayDialog(Frame owner, PluginController controller) 
@@ -92,16 +102,34 @@ public class CommitExistingPathwayDialog extends JDialog
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-       
-        commitTitleField = new JTextField();
+        // (2) REMOVED — commitTitleField = new JTextField();
         descriptionArea = new JTextArea(3, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
         statusArea.setText("Ready.");
 
-        
-        formPanel.add(new JLabel("Commit Title:"));
-        formPanel.add(commitTitleField);
+        dataNodesCheckBox = new JCheckBox("Data nodes");
+        identifiersCheckBox = new JCheckBox("Identifiers");
+        interactionsCheckBox = new JCheckBox("Interactions");
+        titleDescriptionCheckBox = new JCheckBox("Title / description");
+        referencesCheckBox = new JCheckBox("References");
+        ontologyTagsCheckBox = new JCheckBox("Ontology tags");
+        layoutOnlyCheckBox = new JCheckBox("Layout only");
+        otherCheckBox = new JCheckBox("Other");
+        JPanel whatChangedPanel = new JPanel(new GridLayout(3, 3));
+        whatChangedPanel.setBorder(BorderFactory.createTitledBorder("What changed? (optional, helps the reviewer)"));
+        whatChangedPanel.add(dataNodesCheckBox);
+        whatChangedPanel.add(identifiersCheckBox);
+        whatChangedPanel.add(interactionsCheckBox);
+        whatChangedPanel.add(titleDescriptionCheckBox);
+        whatChangedPanel.add(referencesCheckBox);
+        whatChangedPanel.add(ontologyTagsCheckBox);
+        whatChangedPanel.add(layoutOnlyCheckBox);
+        whatChangedPanel.add(otherCheckBox);
+    
+        // (3) REMOVED — the "Commit Title:" label and commitTitleField
+        // used to be added here; no longer shown, title is auto-generated
+        formPanel.add(whatChangedPanel);
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
 
@@ -262,6 +290,9 @@ public class CommitExistingPathwayDialog extends JDialog
     {
         saveButton.setEnabled(false);
 
+        // (4) NEW — auto-generated commit title, replaces commitTitleField.getText()
+        String commitTitle = "Update " + wpidField.getText();
+
         commitWorker = new CommitWorker(controller.getAccessToken(),
             controller.getAuthenticatedUsername(),
             UPSTREAM_REPO,
@@ -269,7 +300,7 @@ public class CommitExistingPathwayDialog extends JDialog
             repoPath,
             controller.getActivePathwayModel(),
             resolvedSha,
-            commitTitleField.getText(),
+            commitTitle,   // (5) CHANGED — was commitTitleField.getText()
             new CommitCallback() 
             {
                 @Override
@@ -295,7 +326,7 @@ public class CommitExistingPathwayDialog extends JDialog
                     statusArea.append("Commit successful. New SHA: " + newSha + "\n");
                     saveButton.setText("Committed");
                     
-                    String prTitle = "Contribution: " + commitTitleField.getText();
+                    String prTitle = "Contribution: " + commitTitle;   // (6) CHANGED — was commitTitleField.getText()
                     String prBody = descriptionArea.getText();
 
                     PullRequestWorker pullRequestWorker = new PullRequestWorker(
