@@ -32,7 +32,6 @@ class SubmitNewPathwayDialog extends JDialog
     private ForkAndBranchWorker forkAndBranchWorker;
 
     private JTextField titleField;
-    private JTextField commitMessageField;
     private JTextArea descriptionArea;
     private JTextArea statusArea;
     private JButton saveButton;
@@ -62,7 +61,7 @@ class SubmitNewPathwayDialog extends JDialog
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
         titleField = new JTextField();
-        commitMessageField = new JTextField();
+      
         descriptionArea = new JTextArea(3, 30);
         wpidField = new JTextField("(assigned after curator approval)");
         wpidField.setEditable(false);
@@ -73,9 +72,7 @@ class SubmitNewPathwayDialog extends JDialog
 
         formPanel.add(new JLabel("Pathway Title:"));
         formPanel.add(titleField);
-        formPanel.add(new JLabel("Commit Message:"));
-        formPanel.add(commitMessageField);
-
+    
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
         formPanel.add(new JLabel("WPID:"));
@@ -136,6 +133,10 @@ class SubmitNewPathwayDialog extends JDialog
                 String sanitizedTitle = sanitizeTitle(titleField.getText());
                 repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
             }
+
+            
+            String commitTitle = "New pathway: " + titleField.getText();
+
             commitWorker = new CommitWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
@@ -144,7 +145,7 @@ class SubmitNewPathwayDialog extends JDialog
                 repoPath,
                 controller.getActivePathwayModel(),
                 null, // sha — always null, this is the create flow
-                commitMessageField.getText(),
+                commitTitle,  
                 new CommitWorker.CommitCallback() {
                     @Override
                     public void onStatusUpdate(String message) 
