@@ -10,6 +10,7 @@ import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.worker.PullRequestWorker;
 import org.pathvisio.githubplugin.service.GitHubForkService;
 import org.pathvisio.githubplugin.service.PullRequestResult;
+import org.bridgedb.Xref;
 
 import javax.swing.*;
 import java.awt.*;
@@ -51,6 +52,7 @@ public class CommitExistingPathwayDialog extends JDialog
     private JLabel shaStatusLabel;
    
     private JTextField commitTitleField;
+    private JTextField wpidField; 
     private JTextArea descriptionArea;
     private JTextArea statusArea;
     private JButton saveButton;
@@ -78,10 +80,14 @@ public class CommitExistingPathwayDialog extends JDialog
         activePathwayLabel = new JLabel("Active Pathway: (loading...)");
         targetRepoLabel = new JLabel("Target Repo: " + UPSTREAM_REPO);
         shaStatusLabel = new JLabel("SHA Status: Checking fork and branch...");
+        wpidField = new JTextField();
+        wpidField.setEditable(false);
 
         contextPanel.add(activePathwayLabel);
         contextPanel.add(targetRepoLabel);
         contextPanel.add(shaStatusLabel);
+        contextPanel.add(new JLabel("WPID:"));
+        contextPanel.add(wpidField);
 
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
@@ -183,6 +189,15 @@ public class CommitExistingPathwayDialog extends JDialog
         else 
         {
             activePathwayLabel.setText("Active Pathway: " + model.getPathway().getTitle());
+            Xref xref = model.getPathway().getXref();
+            if (xref != null) 
+            {
+                wpidField.setText(xref.getId());
+            } 
+            else 
+            {
+                wpidField.setText("(not yet assigned)");
+            }
         }
 
         File gpmlFile = controller.getActiveGpmlFile();
