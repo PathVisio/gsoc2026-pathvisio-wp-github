@@ -37,6 +37,7 @@ class SubmitNewPathwayDialog extends JDialog
     private JTextArea statusArea;
     private JButton saveButton;
     private JButton cancelButton;
+    private JTextField wpidField;
 
     private CommitWorker commitWorker;
     private String confirmedBranch;
@@ -63,6 +64,9 @@ class SubmitNewPathwayDialog extends JDialog
         titleField = new JTextField();
         commitMessageField = new JTextField();
         descriptionArea = new JTextArea(3, 30);
+        wpidField = new JTextField("(assigned after curator approval)");
+        wpidField.setEditable(false);
+        wpidField.setForeground(Color.GRAY);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
         statusArea.setText("Ready.");
@@ -74,6 +78,8 @@ class SubmitNewPathwayDialog extends JDialog
 
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
+        formPanel.add(new JLabel("WPID:"));
+        formPanel.add(wpidField);
 
         JPanel statusPanel = new JPanel(new BorderLayout());
         statusPanel.setBorder(BorderFactory.createTitledBorder("Status"));
