@@ -50,10 +50,8 @@ public class CommitExistingPathwayDialog extends JDialog
     private JLabel activePathwayLabel;
     private JLabel targetRepoLabel;
     private JLabel shaStatusLabel;
-   
-    // (1) REMOVED — private JTextField commitTitleField; no longer needed,
-    // commit title is now auto-generated from wpidField
-    private JTextField wpidField; 
+
+    private JTextField wpidField;
     private JTextArea descriptionArea;
     private JTextArea statusArea;
     private JButton saveButton;
@@ -102,7 +100,6 @@ public class CommitExistingPathwayDialog extends JDialog
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-        // (2) REMOVED — commitTitleField = new JTextField();
         descriptionArea = new JTextArea(3, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
@@ -127,8 +124,6 @@ public class CommitExistingPathwayDialog extends JDialog
         whatChangedPanel.add(layoutOnlyCheckBox);
         whatChangedPanel.add(otherCheckBox);
     
-        // (3) REMOVED — the "Commit Title:" label and commitTitleField
-        // used to be added here; no longer shown, title is auto-generated
         formPanel.add(whatChangedPanel);
         formPanel.add(new JLabel("Description:"));
         formPanel.add(new JScrollPane(descriptionArea));
@@ -168,10 +163,10 @@ public class CommitExistingPathwayDialog extends JDialog
         setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() 
         {
-         @Override
+        @Override
             public void windowClosing(WindowEvent e) 
             {
-                 if (prInProgress)
+                if (prInProgress)
                 {
                     return;
                 }
@@ -207,29 +202,31 @@ public class CommitExistingPathwayDialog extends JDialog
     }
 
     
-     private void populateFromController() 
-     {
+    private void populateFromController() 
+    {
         PathwayModel model = controller.getActivePathwayModel();
         if (model == null) 
         {
             activePathwayLabel.setText("Active Pathway: (none loaded)");
-        } 
-        else 
+        }
+
+        else
         {
             activePathwayLabel.setText("Active Pathway: " + model.getPathway().getTitle());
             Xref xref = model.getPathway().getXref();
-            if (xref != null) 
+            if (xref != null)
             {
                 wpidField.setText(xref.getId());
-            } 
-            else 
+            }
+
+            else
             {
                 wpidField.setText("(not yet assigned)");
             }
         }
 
         File gpmlFile = controller.getActiveGpmlFile();
-        if (gpmlFile != null) 
+        if (gpmlFile != null)
         {
             repoPath = buildRepoPath(gpmlFile);
         }
@@ -248,7 +245,7 @@ public class CommitExistingPathwayDialog extends JDialog
         return "pathways/" + baseName + "/" + fileName;
     }
 
-     private void startForkAndBranch() {
+    private void startForkAndBranch() {
         forkAndBranchWorker = new ForkAndBranchWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
@@ -286,11 +283,11 @@ public class CommitExistingPathwayDialog extends JDialog
 
     // start commit
 
-    private void startCommit() 
+    private void startCommit()
     {
         saveButton.setEnabled(false);
 
-        // (4) NEW — auto-generated commit title, replaces commitTitleField.getText()
+        
         String commitTitle = "Update " + wpidField.getText();
 
         commitWorker = new CommitWorker(controller.getAccessToken(),
@@ -300,11 +297,11 @@ public class CommitExistingPathwayDialog extends JDialog
             repoPath,
             controller.getActivePathwayModel(),
             resolvedSha,
-            commitTitle,   // (5) CHANGED — was commitTitleField.getText()
-            new CommitCallback() 
+            commitTitle,
+            new CommitCallback()
             {
                 @Override
-                public void onStatusUpdate(String message) 
+                public void onStatusUpdate(String message)
                 {
                     statusArea.append(message + "\n");
                 }
@@ -326,8 +323,8 @@ public class CommitExistingPathwayDialog extends JDialog
                     statusArea.append("Commit successful. New SHA: " + newSha + "\n");
                     saveButton.setText("Committed");
                     
-                    String prTitle = "Contribution: " + commitTitle;   // (6) CHANGED — was commitTitleField.getText()
-                    String prBody = descriptionArea.getText();
+                    String prTitle = "Contribution: " + commitTitle;
+                    String prBody = buildCommitDescription();
 
                     PullRequestWorker pullRequestWorker = new PullRequestWorker(
                         controller.getAccessToken(),
@@ -388,10 +385,86 @@ public class CommitExistingPathwayDialog extends JDialog
             });
         commitWorker.execute();
     }
-    
-    private void startShaLookup() 
+
+    private String buildCommitDescription()
     {
-        if (repoPath == null) 
+        StringBuilder changes = new StringBuilder();
+    
+        if (dataNodesCheckBox.isSelected())
+        {
+            appendChange(changes, "Data nodes");
+        }
+
+        if (identifiersCheckBox.isSelected())
+        {
+            appendChange(changes, "Identifiers");
+        }
+
+        if (interactionsCheckBox.isSelected())
+        {
+            appendChange(changes, "Interactions");
+        }
+
+        if (titleDescriptionCheckBox.isSelected())
+        {
+            appendChange(changes, "Title/description");
+        }
+
+        if (referencesCheckBox.isSelected())
+        {
+            appendChange(changes, "References");
+        }
+
+        if (ontologyTagsCheckBox.isSelected())
+        {
+            appendChange(changes, "Ontology tags");
+        }
+
+        if (layoutOnlyCheckBox.isSelected())
+        {
+            appendChange(changes, "Layout only");
+        }
+
+        if (otherCheckBox.isSelected())
+        {
+            appendChange(changes, "Other");
+        }
+
+        String changesLine;
+        if (changes.length() == 0)
+        {
+            changesLine = "No changes specified.";
+        }
+
+        else
+        {
+            changesLine = "Changes: " + changes.toString();
+        }
+
+        String note = descriptionArea.getText();
+        if (note == null || note.trim().isEmpty()) 
+        {
+            return changesLine;
+        }
+        else
+        {
+            return changesLine + "\n\n" + note.trim();
+        }
+    }
+
+
+    private void appendChange(StringBuilder builder, String label) 
+    {
+        if (builder.length() > 0) 
+        {
+            builder.append(", ");
+        }
+        builder.append(label);
+    }
+    
+    private void startShaLookup()
+    {
+        if (repoPath == null)
         {
             statusArea.append("Error: no active GPML file to resolve a path from.\n");
             shaStatusLabel.setText("SHA Status: Unavailable (no active file)");
