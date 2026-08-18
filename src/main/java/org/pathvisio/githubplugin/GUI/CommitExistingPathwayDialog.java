@@ -17,9 +17,14 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.net.URI;
 
 import org.pathvisio.githubplugin.worker.CommitWorker;
 import org.pathvisio.githubplugin.worker.CommitWorker.CommitCallback;
+
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
 
 
 /**
@@ -37,6 +42,7 @@ public class CommitExistingPathwayDialog extends JDialog
     private static final String UPSTREAM_REPO = "sandbox-wp-db";
     private static final String BASE_BRANCH = "main";
     private final PluginController controller;
+    private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";   // Theme A, Step 4
 
     private ForkAndBranchWorker forkAndBranchWorker;
     private ShaLookupWorker shaLookupWorker;
@@ -65,6 +71,11 @@ public class CommitExistingPathwayDialog extends JDialog
     private JCheckBox ontologyTagsCheckBox;
     private JCheckBox layoutOnlyCheckBox;
     private JCheckBox otherCheckBox;
+
+    private JLabel statusLabel;
+    private JPanel statusTextPanel;
+    private JCheckBox showDetailsCheckBox;
+    private JPanel logPanel;
     
 
     public CommitExistingPathwayDialog(Frame owner, PluginController controller) 
@@ -77,7 +88,7 @@ public class CommitExistingPathwayDialog extends JDialog
         startForkAndBranch();
     }
 
-    private void buildUI() 
+    private void buildUI()
     {
         setLayout(new BorderLayout(10, 10));
 
@@ -132,9 +143,29 @@ public class CommitExistingPathwayDialog extends JDialog
         warningBanner.setOpaque(true);
         warningBanner.setBackground(Color.YELLOW);
 
+        
+        statusLabel = new JLabel("Ready.");
+        statusTextPanel = new JPanel();
+        statusTextPanel.setLayout(new BoxLayout(statusTextPanel, BoxLayout.Y_AXIS));
+        statusTextPanel.add(statusLabel);
+
+        showDetailsCheckBox = new JCheckBox("Show details");
+
+        logPanel = new JPanel(new BorderLayout());
+        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
+        logPanel.add(new JScrollPane(statusArea), BorderLayout.CENTER);
+        logPanel.setVisible(false);   // hidden by default
+
         JPanel statusPanel = new JPanel(new BorderLayout());
         statusPanel.setBorder(BorderFactory.createTitledBorder("Status"));
-        statusPanel.add(new JScrollPane(statusArea), BorderLayout.CENTER);
+        statusPanel.add(statusTextPanel, BorderLayout.NORTH);
+        statusPanel.add(showDetailsCheckBox, BorderLayout.CENTER);
+        statusPanel.add(logPanel, BorderLayout.SOUTH);
+
+        showDetailsCheckBox.addItemListener(e -> {
+            logPanel.setVisible(showDetailsCheckBox.isSelected());
+            pack();
+        });
 
         saveButton = new JButton("Save Changes");
         cancelButton = new JButton("Cancel");
@@ -184,6 +215,41 @@ public class CommitExistingPathwayDialog extends JDialog
         pack();
         setLocationRelativeTo(getOwner());
     }
+
+    private void showDashboardLink() 
+    {
+        JLabel dashboardLink = new JLabel("<html><a href=''>Your pathway was submitted — see it on the dashboard</a></html>");
+        dashboardLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        dashboardLink.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) 
+            {
+                if (Desktop.isDesktopSupported()) 
+                {
+                    try 
+                    {
+                        Desktop.getDesktop().browse(new URI(DASHBOARD_URL));
+                    } 
+                    catch (Exception ex) 
+                    {
+                        statusArea.append("Could not open link: " + ex.getMessage() + "\n");
+                    }
+                } 
+                else 
+                {
+                    statusArea.append("Open this link in your browser: " + DASHBOARD_URL + "\n");
+                }
+            }
+        });
+
+        statusLabel.setText("Your pathway was submitted for review.");
+        statusLabel.setIcon(null);
+        
+        statusTextPanel.add(dashboardLink);
+        statusTextPanel.revalidate();
+        statusTextPanel.repaint();
+    }
+
 
     private void cancelRunningWorkers() 
     {
@@ -245,49 +311,57 @@ public class CommitExistingPathwayDialog extends JDialog
         return "pathways/" + baseName + "/" + fileName;
     }
 
-    private void startForkAndBranch() {
+    private void startForkAndBranch()
+    {
+        statusLabel.setText("Checking if your submission is ready...");
+
         forkAndBranchWorker = new ForkAndBranchWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
                 UPSTREAM_REPO,
                 null,
-                new ForkAndBranchCallback() {
+                new ForkAndBranchCallback()
+                {
                     @Override
-                    public void onStatusUpdate(String message) {
+                    public void onStatusUpdate(String message)
+                    {
                         statusArea.append(message + "\n");
                     }
 
                     @Override
-                    public void onConflict() {
+                    public void onConflict()
+                    {
                         statusArea.append("Fork has diverged and could not be synced.\n");
                         shaStatusLabel.setText("SHA Status: Blocked (fork conflict)");
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
 
                     @Override
-                    public void onSuccess(String branchName) {
+                    public void onSuccess(String branchName)
+                    {
                         confirmedBranch = branchName;
                         controller.setConfirmedBranch(branchName);
                         controller.setForkReady(true);
                         statusArea.append("Branch ready: " + branchName + "\n");
+                        statusLabel.setText("Looking up the existing file...");
                         startShaLookup();
                     }
 
                     @Override
-                    public void onFailure(String errorMessage) {
+                    public void onFailure(String errorMessage)
+                    {
                         statusArea.append("Error: " + errorMessage + "\n");
                         shaStatusLabel.setText("SHA Status: Unavailable (fork/branch error)");
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
                 });
         forkAndBranchWorker.execute();
     }
 
-    // start commit
-
     private void startCommit()
     {
         saveButton.setEnabled(false);
-
-        
+        statusLabel.setText("Saving your changes...");
         String commitTitle = "Update " + wpidField.getText();
 
         commitWorker = new CommitWorker(controller.getAccessToken(),
@@ -314,6 +388,7 @@ public class CommitExistingPathwayDialog extends JDialog
                         + "loaded. Please close this dialog and try again to "
                         + "pick up the latest version.\n");
                     saveButton.setEnabled(true);
+                    statusLabel.setText("Someone else has changed this pathway. Please close this window and try again.");
                 }
 
                 @Override
@@ -322,7 +397,7 @@ public class CommitExistingPathwayDialog extends JDialog
                     resolvedSha = newSha;
                     statusArea.append("Commit successful. New SHA: " + newSha + "\n");
                     saveButton.setText("Committed");
-                    
+                    statusLabel.setText("Your changes were saved. Submitting for review...");
                     String prTitle = "Contribution: " + commitTitle;
                     String prBody = buildCommitDescription();
 
@@ -351,15 +426,18 @@ public class CommitExistingPathwayDialog extends JDialog
                                 prInProgress = false;
                                 cancelButton.setEnabled(true);
                                 cancelButton.setText("Close");
+                                showDashboardLink();
+
                             }
                             
                             @Override
-                            public void onValidationFailure(String message) 
+                            public void onValidationFailure(String message)
                             {
                                 statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
                                 prInProgress = false;
                                 cancelButton.setEnabled(true);
                                 cancelButton.setText("Close");
+                                statusLabel.setText("Your changes were saved, but the submission for review failed. See details below.");
                             }
 
                             @Override
@@ -369,6 +447,7 @@ public class CommitExistingPathwayDialog extends JDialog
                                 prInProgress = false;
                                 cancelButton.setEnabled(true);
                                 cancelButton.setText("Close");
+                                statusLabel.setText("Your changes were saved, but the submission for review failed. See details below.");
                             }
                         }
                     );
@@ -381,6 +460,7 @@ public class CommitExistingPathwayDialog extends JDialog
                 {
                     statusArea.append("Error: " + errorMessage + "\n");
                     saveButton.setEnabled(true);
+                    statusLabel.setText("There was a problem preparing your submission. See details below.");
                 }
             });
         commitWorker.execute();
@@ -468,6 +548,7 @@ public class CommitExistingPathwayDialog extends JDialog
         {
             statusArea.append("Error: no active GPML file to resolve a path from.\n");
             shaStatusLabel.setText("SHA Status: Unavailable (no active file)");
+            statusLabel.setText("There was a problem preparing your submission. See details below.");
             return;
         }
 
@@ -487,12 +568,16 @@ public class CommitExistingPathwayDialog extends JDialog
                     public void onShaResolved(String sha) 
                     {
                         resolvedSha = sha;
-                        if (sha == null) {
+                        if (sha == null)
+                        {
                             shaStatusLabel.setText("SHA Status: No existing file at this path (will create)");
-                        } else {
+                        }
+                        else
+                        {
                             shaStatusLabel.setText("SHA Status: Existing file found (will update)");
                         }
                         saveButton.setEnabled(true);
+                        statusLabel.setText("Ready. Fill in what changed and click Save.");
                     }
 
                     @Override
@@ -500,6 +585,7 @@ public class CommitExistingPathwayDialog extends JDialog
                     {
                         statusArea.append("Error: " + errorMessage + "\n");
                         shaStatusLabel.setText("SHA Status: Lookup failed");
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
                 });
         shaLookupWorker.execute();
