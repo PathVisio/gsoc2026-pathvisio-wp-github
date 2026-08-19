@@ -201,17 +201,67 @@ public class GitHubBranchService
      * @see <a href="https://docs.github.com/en/rest/git/refs#delete-a-reference">
      *      DELETE /repos/{owner}/{repo}/git/refs/{ref}</a>
      */
-    public void deleteBranch(String branchName) throws IOException 
+    public void deleteBranch(String branchName) throws IOException
     {
         String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/refs/heads/" + branchName;
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "DELETE", accessToken);
         int status = connection.getResponseCode();
         connection.disconnect();
 
-        if (status != 204) 
+        if (status != 204)
         {
             throw new IOException("Branch deletion failed for '" + branchName + "'. GitHub returned: " + status);
         }
+    }
+
+    /**
+     * Searches the configured fork for a branch whose name starts with the
+     * given prefix, returning the first match.
+     *
+     * <p>
+     * Sends GET to /repos/{forkOwner}/{repoName}/branches, which returns a
+     * JSON array of branch objects. Used by Theme E's branch-reuse logic to
+     * check whether the current user already has a branch for a given
+     * pathway (named as {@code wpid_username_...}) before creating a new one.
+     * </p>
+        * Note: this does not paginate. GitHub's branches endpoint returns up to
+        * 30 branches per page by default; a fork with more branches than that
+        * would need pagination to search exhaustively. For a typical
+        * single-contributor fork used only for this plugin's contributions,
+        * this is expected to be sufficient — worth revisiting if forks with a
+        * large branch count are observed in practice.
+     * @param prefix The branch-name prefix to search for (e.g.
+     *               {@code "WP4321_sneha_"}).
+     * @return The full name of the first matching branch, or {@code null} if
+     *         none match.
+     * @throws IOException If the branch list cannot be retrieved or an
+     *                      unexpected HTTP status is returned.
+     * @see <a href="https://docs.github.com/en/rest/branches/branches#list-branches">
+     *      GET /repos/{owner}/{repo}/branches</a>
+     */
+    public String findBranchByPrefix(String prefix) throws IOException 
+    {
+        String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/branches";
+        HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", accessToken);
+        int status = connection.getResponseCode();
+        String body = HttpUtil.readResponseBody(connection);
+        connection.disconnect();
+
+        if (status != 200)
+        {
+            throw new IOException("Could not list branches for '" + forkOwner + "/" + repoName + "'. Status: " + status);
+        }
+
+        java.util.List<String> branches = JsonParser.extractAllArrayElements(body);
+        for (String branchJson : branches)
+        {
+            String name = JsonParser.extractValue(branchJson, "name");
+            if (name != null && name.startsWith(prefix))
+            {
+                return name;
+            }
+        }
+        return null;
     }
 
     /**
