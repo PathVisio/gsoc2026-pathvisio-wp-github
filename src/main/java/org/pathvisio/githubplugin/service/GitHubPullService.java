@@ -311,7 +311,8 @@ public class GitHubPullService
             throw new IOException(
                     "Empty response body received from GitHub pulls API.");
         }
-
+        String mergedField = JsonParser.extractValue(responseJson, "merged");
+        boolean merged = Boolean.parseBoolean(mergedField);
         String numberField = JsonParser.extractValue(responseJson, "number");
         String htmlUrl     = JsonParser.extractValue(responseJson, "html_url");
         String state       = JsonParser.extractValue(responseJson, "state");
@@ -328,7 +329,7 @@ public class GitHubPullService
                     + "Value was: " + numberField + ". Full response: " + responseJson, e);
         }
 
-        return new PullRequestResult(number, htmlUrl, state);
+        return new PullRequestResult(number, htmlUrl, state, merged);
     }
 
     /**

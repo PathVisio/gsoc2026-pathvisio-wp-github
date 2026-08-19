@@ -50,17 +50,26 @@ public class PullRequestResult {
     private final String state;
 
     /**
+     * Whether the pull request has been merged. {@code false} for an open
+     * PR, and also {@code false} for a closed-but-not-merged (rejected) PR
+     * — only {@code true} once GitHub's own {@code merged} field confirms
+     * an actual merge happened.
+     */
+    private final boolean merged;
+
+    /**
      * Creates a new {@code PullRequestResult}.
      *
      * @param number  the pull request number
      * @param htmlUrl the full browser URL for the pull request
      * @param state   the pull request state (e.g. {@code "open"})
      */
-    public PullRequestResult(int number, String htmlUrl, String state) 
+    public PullRequestResult(int number, String htmlUrl, String state, boolean merged)
     {
         this.number = number;
         this.htmlUrl = htmlUrl;
         this.state = state;
+        this.merged = merged;
     }
 
     /**
