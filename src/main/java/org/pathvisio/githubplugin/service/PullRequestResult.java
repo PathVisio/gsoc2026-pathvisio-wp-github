@@ -56,7 +56,8 @@ public class PullRequestResult {
      * @param htmlUrl the full browser URL for the pull request
      * @param state   the pull request state (e.g. {@code "open"})
      */
-    public PullRequestResult(int number, String htmlUrl, String state) {
+    public PullRequestResult(int number, String htmlUrl, String state) 
+    {
         this.number = number;
         this.htmlUrl = htmlUrl;
         this.state = state;
@@ -67,7 +68,8 @@ public class PullRequestResult {
      *
      * @return the PR number as assigned by GitHub
      */
-    public int getNumber() {
+    public int getNumber()
+    {
         return number;
     }
 
@@ -76,7 +78,8 @@ public class PullRequestResult {
      *
      * @return the HTML URL to view the pull request
      */
-    public String getHtmlUrl() {
+    public String getHtmlUrl() 
+    {
         return htmlUrl;
     }
 
@@ -88,5 +91,15 @@ public class PullRequestResult {
     public String getState()
     {
         return state;
+    }
+    /**
+     * Returns whether the pull request has been merged.
+     *
+     * @return {@code true} if merged, {@code false} otherwise (including
+     *         open PRs and closed-but-not-merged PRs)
+     */
+    public boolean isMerged()
+    {
+        return merged;
     }
 }
