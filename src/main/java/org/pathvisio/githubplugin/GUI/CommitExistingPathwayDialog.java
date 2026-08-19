@@ -2,8 +2,10 @@ package org.pathvisio.githubplugin.GUI;
 
 
 import org.pathvisio.githubplugin.controller.PluginController;
-import org.pathvisio.githubplugin.worker.ForkAndBranchWorker;
-import org.pathvisio.githubplugin.worker.ForkAndBranchWorker.ForkAndBranchCallback;
+import org.pathvisio.githubplugin.worker.ForkCheckWorker;
+import org.pathvisio.githubplugin.worker.ForkCheckWorker.ForkCheckCallback;
+import org.pathvisio.githubplugin.worker.BranchReuseWorker;
+import org.pathvisio.githubplugin.worker.BranchReuseWorker.BranchReuseCallback;
 import org.pathvisio.githubplugin.worker.ShaLookupWorker;
 import org.pathvisio.githubplugin.worker.ShaLookupWorker.ShaLookupCallback;
 import org.pathvisio.libgpml.model.PathwayModel;
@@ -31,11 +33,14 @@ import java.awt.event.MouseEvent;
  * Dialog for committing changes to an existing pathway already present in
  * the WikiPathways repository.
  *
- * <p>Sequence: {@link ForkAndBranchWorker} confirms fork/branch readiness,
- * then on success a {@link ShaLookupWorker} resolves the existing file's
- * SHA at the derived repo path. Save Changes stays disabled until both
- * complete. Commits via {@code CommitWorker} (Module 8, complete) with the
- * resolved SHA — this is the update flow, unlike create flow.</p>
+ * <p>Sequence: on open, {@link ForkCheckWorker} confirms the fork exists
+ * and is synced, then on success a {@link ShaLookupWorker} resolves the
+ * existing file's SHA at the derived repo path. Save Changes stays
+ * disabled until both complete. On Save click, {@link BranchReuseWorker}
+ * resolves which branch to commit to — reusing an abandoned branch,
+ * deleting and recreating one whose prior PR was merged, or blocking if
+ * an earlier PR is still open — before committing via {@code CommitWorker}
+ * with the resolved SHA. This is the update flow, unlike create flow.</p>
  */
 public class CommitExistingPathwayDialog extends JDialog
 {
@@ -44,7 +49,8 @@ public class CommitExistingPathwayDialog extends JDialog
     private final PluginController controller;
     private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";   // Theme A, Step 4
 
-    private ForkAndBranchWorker forkAndBranchWorker;
+    private ForkCheckWorker forkCheckWorker;
+    private BranchReuseWorker branchReuseWorker;
     private ShaLookupWorker shaLookupWorker;
     private CommitWorker commitWorker;
 
@@ -85,7 +91,7 @@ public class CommitExistingPathwayDialog extends JDialog
 
         buildUI();
         populateFromController();
-        startForkAndBranch();
+        startForkCheck();
     }
 
     private void buildUI()
@@ -206,7 +212,7 @@ public class CommitExistingPathwayDialog extends JDialog
             }
         });
 
-        saveButton.addActionListener(e -> startCommit());
+    saveButton.addActionListener(e -> startBranchReuseCheck());
 
         add(contextPanel, BorderLayout.NORTH);
         add(formPanel, BorderLayout.CENTER);
@@ -222,20 +228,20 @@ public class CommitExistingPathwayDialog extends JDialog
         dashboardLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         dashboardLink.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) 
+            public void mouseClicked(MouseEvent e)
             {
-                if (Desktop.isDesktopSupported()) 
+                if (Desktop.isDesktopSupported())
                 {
-                    try 
+                    try
                     {
                         Desktop.getDesktop().browse(new URI(DASHBOARD_URL));
-                    } 
-                    catch (Exception ex) 
+                    }
+                    catch (Exception ex)
                     {
                         statusArea.append("Could not open link: " + ex.getMessage() + "\n");
                     }
-                } 
-                else 
+                }
+                else
                 {
                     statusArea.append("Open this link in your browser: " + DASHBOARD_URL + "\n");
                 }
@@ -251,27 +257,31 @@ public class CommitExistingPathwayDialog extends JDialog
     }
 
 
-    private void cancelRunningWorkers() 
+    private void cancelRunningWorkers()
     {
-        if (forkAndBranchWorker != null) 
+        if (forkCheckWorker != null)
         {
-            forkAndBranchWorker.cancel(true);
+            forkCheckWorker.cancel(true);
         }
-        if (shaLookupWorker != null) 
+        if (branchReuseWorker != null)
+        {
+            branchReuseWorker.cancel(true);
+        }
+        if (shaLookupWorker != null)
         {
             shaLookupWorker.cancel(true);
         }
-        if (commitWorker != null) 
+        if (commitWorker != null)
         {
             commitWorker.cancel(true);
         }
     }
 
     
-    private void populateFromController() 
+    private void populateFromController()
     {
         PathwayModel model = controller.getActivePathwayModel();
-        if (model == null) 
+        if (model == null)
         {
             activePathwayLabel.setText("Active Pathway: (none loaded)");
         }
@@ -311,16 +321,15 @@ public class CommitExistingPathwayDialog extends JDialog
         return "pathways/" + baseName + "/" + fileName;
     }
 
-    private void startForkAndBranch()
+    private void startForkCheck()
     {
         statusLabel.setText("Checking if your submission is ready...");
 
-        forkAndBranchWorker = new ForkAndBranchWorker(
+        forkCheckWorker = new ForkCheckWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
                 UPSTREAM_REPO,
-                null,
-                new ForkAndBranchCallback()
+                new ForkCheckCallback()
                 {
                     @Override
                     public void onStatusUpdate(String message)
@@ -337,12 +346,10 @@ public class CommitExistingPathwayDialog extends JDialog
                     }
 
                     @Override
-                    public void onSuccess(String branchName)
+                    public void onSuccess()
                     {
-                        confirmedBranch = branchName;
-                        controller.setConfirmedBranch(branchName);
                         controller.setForkReady(true);
-                        statusArea.append("Branch ready: " + branchName + "\n");
+                        statusArea.append("Fork ready.\n");
                         statusLabel.setText("Looking up the existing file...");
                         startShaLookup();
                     }
@@ -351,11 +358,11 @@ public class CommitExistingPathwayDialog extends JDialog
                     public void onFailure(String errorMessage)
                     {
                         statusArea.append("Error: " + errorMessage + "\n");
-                        shaStatusLabel.setText("SHA Status: Unavailable (fork/branch error)");
+                        shaStatusLabel.setText("SHA Status: Unavailable (fork error)");
                         statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
                 });
-        forkAndBranchWorker.execute();
+        forkCheckWorker.execute();
     }
 
     private void startCommit()
@@ -464,6 +471,51 @@ public class CommitExistingPathwayDialog extends JDialog
                 }
             });
         commitWorker.execute();
+    }
+
+    private void startBranchReuseCheck()
+    {
+        saveButton.setEnabled(false);
+        statusLabel.setText("Checking branch status...");
+
+        branchReuseWorker = new BranchReuseWorker(
+                controller.getAccessToken(),
+                controller.getAuthenticatedUsername(),
+                UPSTREAM_REPO,
+                wpidField.getText(),
+                new BranchReuseCallback()
+                {
+                    @Override
+                    public void onStatusUpdate(String message)
+                    {
+                        statusArea.append(message + "\n");
+                    }
+
+                    @Override
+                    public void onBlocked(String reason)
+                    {
+                        statusArea.append("Blocked: " + reason + "\n");
+                        statusLabel.setText(reason);
+                    }
+
+                    @Override
+                    public void onSuccess(String branchName)
+                    {
+                        confirmedBranch = branchName;
+                        controller.setConfirmedBranch(branchName);
+                        statusArea.append("Branch ready: " + branchName + "\n");
+                        startCommit();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage)
+                    {
+                        statusArea.append("Error: " + errorMessage + "\n");
+                        saveButton.setEnabled(true);
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
+                    }
+                });
+        branchReuseWorker.execute();
     }
 
     private String buildCommitDescription()
