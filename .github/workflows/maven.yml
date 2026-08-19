@@ -1,15 +1,12 @@
 name: PathVisio GitHub Plugin CI
-
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
 
@@ -20,8 +17,32 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Checkout PathVisio core (pathvisio4-ant)
+      uses: actions/checkout@v4
+      with:
+        repository: PathVisio/pathvisio4-ant
+        path: pathvisio4-ant
+
+    - name: Set up Ant
+      run: sudo apt-get install -y ant
+
+    - name: Build PathVisio core jars with Ant
+      working-directory: pathvisio4-ant
+      run: ant desktop.jar
+
+    - name: Install PathVisio jars into local Maven repo
+      run: |
+        mvn install:install-file -Dfile=pathvisio4-ant/modules/org.pathvisio.core.jar \
+            -DgroupId=org.pathvisio -DartifactId=org.pathvisio.core \
+            -Dversion=4.0.0-local -Dpackaging=jar
+        mvn install:install-file -Dfile=pathvisio4-ant/modules/org.pathvisio.gui.jar \
+            -DgroupId=org.pathvisio -DartifactId=org.pathvisio.gui \
+            -Dversion=4.0.0-local -Dpackaging=jar
+        mvn install:install-file -Dfile=pathvisio4-ant/modules/org.pathvisio.desktop.jar \
+            -DgroupId=org.pathvisio -DartifactId=org.pathvisio.desktop \
+            -Dversion=4.0.0-local -Dpackaging=jar
+
     - name: Build with Maven
       run: mvn -B package --file pom.xml
-
     - name: Run tests
       run: mvn -B test --file pom.xml
