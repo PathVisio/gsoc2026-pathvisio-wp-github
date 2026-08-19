@@ -94,10 +94,6 @@ public class GitHubPullService
      */
     private final String accessToken;
 
-    // =========================================================================
-    // Constructor
-    // =========================================================================
-
     /**
      * Creates a new {@code GitHubPullService}.
      *
@@ -228,7 +224,62 @@ public class GitHubPullService
             connection.disconnect();
         }
     }
-   
+
+    /**
+     * Looks up whether a pull request already exists for the given head
+     * branch, regardless of state (open or closed).
+     *
+     * <p>
+     * Sends a GET request to the pulls endpoint filtered by
+     * {@code head=forkOwner:headBranch&state=all}. GitHub returns a JSON
+     * array — empty if no PR exists for that branch, or containing matching
+     * PRs otherwise (in practice, at most one for a given head/base pair,
+     * though this reads only the first array element regardless).
+     * </p>
+     *
+     * @param headBranch the branch on the fork to check for an existing PR
+     * @return a {@link PullRequestResult} for the first matching PR, or
+     *         {@code null} if no PR exists for this branch
+     * @throws IOException if the HTTP call fails or GitHub returns a
+     *                      non-success status
+     */
+    public PullRequestResult findPullRequestForBranch(String headBranch) throws IOException
+    {
+        if (headBranch == null)
+        {
+            throw new IllegalArgumentException("headBranch must not be null");
+        }
+
+        String head = forkOwner + ":" + headBranch;
+        String url = String.format(PULLS_API, upstreamOwner, repoName)+ "?head=" + head + "&state=all";
+
+        HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(url, "GET", accessToken);
+
+        try
+        {
+            int status = connection.getResponseCode();
+            String responseBody = HttpUtil.readResponseBody(connection);
+
+            if (status != HttpURLConnection.HTTP_OK)
+            {
+                throw new IOException(
+                        "Could not look up pull requests for branch '" + headBranch + "'. HTTP " + status + " — " + responseBody);
+            }
+
+            String firstMatch = JsonParser.extractFirstArrayElement(responseBody);
+            if (firstMatch == null)
+            {
+                return null;   // no existing PR for this branch
+            }
+
+            return parsePullResponse(firstMatch);
+        }
+        finally
+        {
+            connection.disconnect();
+        }
+    }
+
 
     /**
      * Writes the JSON payload to the connection's output stream.
