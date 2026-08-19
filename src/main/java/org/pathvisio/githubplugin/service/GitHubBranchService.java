@@ -178,9 +178,39 @@ public class GitHubBranchService
         connection.getOutputStream().write(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         int status = connection.getResponseCode();
         connection.disconnect();
-         if (status != 201) 
+        if (status != 201) 
         {
             throw new IOException("Branch creation failed for '" + newBranchName + "'. GitHub returned: " + status);
+        }
+    }
+
+    /**
+     * Deletes a branch from the configured fork.
+     *
+     * <p>
+     * Sends DELETE to /repos/{forkOwner}/{repoName}/git/refs/heads/{branchName}.
+     * A successful deletion returns HTTP 204 No Content, per GitHub's REST API
+     * convention for ref deletion. Used by Theme E's branch-reuse logic to
+     * clean up a stale branch once its associated pull request has been merged,
+     * before creating a fresh branch for a new contribution.
+     * </p>
+     *
+     * @param branchName The branch name to delete (without refs/heads/).
+     * @throws IOException If the deletion fails or GitHub returns a status
+     *                      other than 204 No Content.
+     * @see <a href="https://docs.github.com/en/rest/git/refs#delete-a-reference">
+     *      DELETE /repos/{owner}/{repo}/git/refs/{ref}</a>
+     */
+    public void deleteBranch(String branchName) throws IOException 
+    {
+        String endpoint = API_BASE + "/repos/" + forkOwner + "/" + repoName + "/git/refs/heads/" + branchName;
+        HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "DELETE", accessToken);
+        int status = connection.getResponseCode();
+        connection.disconnect();
+
+        if (status != 204) 
+        {
+            throw new IOException("Branch deletion failed for '" + branchName + "'. GitHub returned: " + status);
         }
     }
 
@@ -209,12 +239,12 @@ public class GitHubBranchService
      * @return The branchName, guaranteed to exist (or an IOException is thrown).
      * @throws IOException If any network/API call fails or returns an unexpected status.
      */
-     public String ensureBranchExists(String upstreamOwner, String branchName) throws IOException 
-     {
+    public String ensureBranchExists(String upstreamOwner, String branchName) throws IOException 
+    {
         if (branchExists(branchName)) return branchName;
         String defaultBranch = getDefaultBranch(upstreamOwner);
         String headSha = getHeadSHA(defaultBranch);
         createBranch(branchName, headSha);
         return branchName;
-     }
+    }
 }
