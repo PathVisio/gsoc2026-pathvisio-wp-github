@@ -15,14 +15,18 @@
  * the License.
  ******************************************************************************/
 package org.pathvisio.githubplugin.util;
- 
+
 /**
  * Utility class for parsing flat JSON responses from the GitHub REST API.
  *
  * <p>This parser handles the simple, flat JSON structures returned by GitHub's
- * authentication and repository endpoints. It does not support nested objects,
- * arrays, or other complex JSON structures — use a full JSON library such as
- * Gson or Jackson if those are required.</p>
+* authentication and repository endpoints. It supports flat key lookups,
+* one level of key-based nesting via {@link #extractNestedValue}, and
+* extracting the first element of a top-level JSON array via
+* {@link #extractFirstArrayElement}. It does not support arrays nested
+* inside objects, multiple array elements beyond the first, or deeper
+* structures — use a full JSON library such as Gson or Jackson if those
+* are required.</p>
  *
  * <p>This class is intentionally kept separate from authentication logic
  * so that JSON parsing can be tested independently without requiring
@@ -137,7 +141,7 @@ public final class JsonParser
  * call extractNestedValue(json, "object", "sha") → returns "abc123"
  *
  */
-public static String extractNestedValue(String json, String outerKey, String innerKey) 
+public static String extractNestedValue(String json, String outerKey, String innerKey)
 {
 
     String blockSearch = "\"" + outerKey + "\":{";
@@ -162,5 +166,68 @@ public static String extractNestedValue(String json, String outerKey, String inn
     String innerBlock = json.substring(blockStart, end + 1);
     return extractValue(innerBlock, innerKey);
 }
+/**
+ * Extracts the first element of a top-level JSON array as its own
+ * self-contained object string.
+ *
+ * <p>Handles the common GitHub REST API shape where an endpoint returns a
+ * bare JSON array of objects (e.g. {@code [{"number":264,...},{"number":265,...}]})
+ * rather than a single flat object. Uses the same brace-depth-counting
+ * technique as {@link #extractNestedValue(String, String, String)} to
+ * correctly handle objects containing their own nested objects.</p>
+ *
+ * <p>Example:</p>
+ * <pre>
+ * String json = "[{\"number\":264,\"state\":\"open\"},{\"number\":265,\"state\":\"closed\"}]";
+ * String first = JsonParser.extractFirstArrayElement(json);
+ * // first == "{\"number\":264,\"state\":\"open\"}"
+ * String number = JsonParser.extractValue(first, "number"); // "264"
+ * </pre>
+ *
+ * <p>Returns {@code null} for an empty array ({@code "[]"}), a malformed
+ * array with unbalanced braces, or if no opening {@code [} is found at all.</p>
+ *
+ * @param json the raw JSON string — expected to be a top-level array
+ * @return the first array element as a JSON object substring, or
+ *         {@code null} if the array is empty or malformed
+ */
+public static String extractFirstArrayElement(String json)
+{
+    int arrayStart = json.indexOf('[');
+    if (arrayStart == -1)
+    {
+        return null;
+    }
 
+    int objStart = json.indexOf('{', arrayStart);
+    if (objStart == -1)
+    {
+        return null;   // empty array, e.g. "[]"
+    }
+
+    int depth = 0;
+    int end = objStart;
+    while (end < json.length())
+    {
+        if (json.charAt(end) == '{')
+        {
+            depth++;
+        }
+        else if (json.charAt(end) == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                break;
+            }
+        }
+        end++;
+    }
+    if (depth != 0)
+    {
+        return null;   // malformed — braces never balanced
+    }
+
+    return json.substring(objStart, end + 1);
+}
 }
