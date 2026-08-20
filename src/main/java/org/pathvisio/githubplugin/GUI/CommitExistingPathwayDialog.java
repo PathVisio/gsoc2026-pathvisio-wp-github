@@ -12,7 +12,7 @@ import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.worker.PullRequestWorker;
 import org.pathvisio.githubplugin.service.GitHubForkService;
 import org.pathvisio.githubplugin.service.PullRequestResult;
-import org.bridgedb.Xref;
+
 
 import javax.swing.*;
 import java.awt.*;
@@ -289,10 +289,11 @@ public class CommitExistingPathwayDialog extends JDialog
         else
         {
             activePathwayLabel.setText("Active Pathway: " + model.getPathway().getTitle());
-            Xref xref = model.getPathway().getXref();
-            if (xref != null)
+            String version = model.getPathway().getVersion();
+            if (version != null && version.matches("^WP\\d+.*"))
             {
-                wpidField.setText(xref.getId());
+                int underscoreIndex = version.indexOf('_');
+                wpidField.setText(underscoreIndex > 0 ? version.substring(0, underscoreIndex) : version);
             }
 
             else
@@ -475,6 +476,15 @@ public class CommitExistingPathwayDialog extends JDialog
 
     private void startBranchReuseCheck()
     {
+        String wpid = wpidField.getText();
+        if (wpid == null || !wpid.matches("^WP\\d+$"))
+        {
+            statusArea.append("Error: this pathway has no valid WPID (field shows: \"" + wpid + "\"). "
+                + "Branch operations require a real WPID and cannot proceed.\n");
+            statusLabel.setText("This pathway doesn't have a WPID yet — use \"Submit New Pathway\" instead.");
+            saveButton.setEnabled(false);
+            return;
+        }
         saveButton.setEnabled(false);
         statusLabel.setText("Checking branch status...");
 
