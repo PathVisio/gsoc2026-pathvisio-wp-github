@@ -61,7 +61,6 @@ public class CommitExistingPathwayDialog extends JDialog
 
     private JLabel activePathwayLabel;
     private JLabel targetRepoLabel;
-    private JLabel shaStatusLabel;
 
     private JTextField wpidField;
     private JTextArea descriptionArea;
@@ -104,20 +103,20 @@ public class CommitExistingPathwayDialog extends JDialog
 
         activePathwayLabel = new JLabel("Active Pathway: (loading...)");
         targetRepoLabel = new JLabel("Target Repo: " + UPSTREAM_REPO);
-        shaStatusLabel = new JLabel("SHA Status: Checking fork and branch...");
         wpidField = new JTextField();
         wpidField.setEditable(false);
+        wpidField.setFocusable(false);
+        wpidField.setFont(wpidField.getFont().deriveFont(Font.BOLD, wpidField.getFont().getSize() + 2f));
 
         contextPanel.add(activePathwayLabel);
         contextPanel.add(targetRepoLabel);
-        contextPanel.add(shaStatusLabel);
         contextPanel.add(new JLabel("WPID:"));
         contextPanel.add(wpidField);
 
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-        descriptionArea = new JTextArea(3, 30);
+        descriptionArea = new JTextArea(1, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
         statusArea.setText("Ready.");
@@ -141,18 +140,18 @@ public class CommitExistingPathwayDialog extends JDialog
         whatChangedPanel.add(layoutOnlyCheckBox);
         whatChangedPanel.add(otherCheckBox);
     
-        formPanel.add(whatChangedPanel);
-        formPanel.add(new JLabel("Description:"));
+        JLabel commentLabel = new JLabel("Additional Comment:");
+        formPanel.add(commentLabel);
         formPanel.add(new JScrollPane(descriptionArea));
 
-        JLabel warningBanner = new JLabel("This commit will be made to the branch specified above.");
+        JLabel warningBanner = new JLabel("This commit will be submitted as a pull request for review.");
         warningBanner.setOpaque(true);
         warningBanner.setBackground(Color.YELLOW);
-
         
         statusLabel = new JLabel("Ready.");
         statusTextPanel = new JPanel();
         statusTextPanel.setLayout(new BoxLayout(statusTextPanel, BoxLayout.Y_AXIS));
+        statusTextPanel.setBackground(Color.WHITE);
         statusTextPanel.add(statusLabel);
 
         showDetailsCheckBox = new JCheckBox("Show details");
@@ -164,6 +163,7 @@ public class CommitExistingPathwayDialog extends JDialog
 
         JPanel statusPanel = new JPanel(new BorderLayout());
         statusPanel.setBorder(BorderFactory.createTitledBorder("Status"));
+        statusPanel.setBackground(Color.WHITE);
         statusPanel.add(statusTextPanel, BorderLayout.NORTH);
         statusPanel.add(showDetailsCheckBox, BorderLayout.CENTER);
         statusPanel.add(logPanel, BorderLayout.SOUTH);
@@ -173,7 +173,7 @@ public class CommitExistingPathwayDialog extends JDialog
             pack();
         });
 
-        saveButton = new JButton("Save Changes");
+        saveButton = new JButton("Submit Pathway");
         cancelButton = new JButton("Cancel");
         saveButton.setEnabled(false);
 
@@ -224,7 +224,7 @@ public class CommitExistingPathwayDialog extends JDialog
 
     private void showDashboardLink() 
     {
-        JLabel dashboardLink = new JLabel("<html><a href=''>Your pathway was submitted — see it on the dashboard</a></html>");
+        JLabel dashboardLink = new JLabel("<html><a href=''>see it on the dashboard</a></html>");
         dashboardLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         dashboardLink.addMouseListener(new MouseAdapter() {
             @Override
@@ -341,9 +341,9 @@ public class CommitExistingPathwayDialog extends JDialog
                     @Override
                     public void onConflict()
                     {
-                        statusArea.append("Fork has diverged and could not be synced.\n");
-                        shaStatusLabel.setText("SHA Status: Blocked (fork conflict)");
-                        statusLabel.setText("There was a problem preparing your submission. See details below.");
+                    statusArea.append("Fork has diverged and could not be synced.\n");
+                    statusArea.append("SHA Status: Blocked (fork conflict)\n");
+                    statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
 
                     @Override
@@ -359,7 +359,7 @@ public class CommitExistingPathwayDialog extends JDialog
                     public void onFailure(String errorMessage)
                     {
                         statusArea.append("Error: " + errorMessage + "\n");
-                        shaStatusLabel.setText("SHA Status: Unavailable (fork error)");
+                        statusArea.append("SHA Status: Unavailable (fork error)\n");
                         statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
                 });
@@ -609,7 +609,7 @@ public class CommitExistingPathwayDialog extends JDialog
         if (repoPath == null)
         {
             statusArea.append("Error: no active GPML file to resolve a path from.\n");
-            shaStatusLabel.setText("SHA Status: Unavailable (no active file)");
+            statusArea.append("SHA Status: Unavailable (no active file)\n");
             statusLabel.setText("There was a problem preparing your submission. See details below.");
             return;
         }
@@ -632,21 +632,21 @@ public class CommitExistingPathwayDialog extends JDialog
                         resolvedSha = sha;
                         if (sha == null)
                         {
-                            shaStatusLabel.setText("SHA Status: No existing file at this path (will create)");
+                            statusArea.append("SHA Status: No existing file at this path (will create)\n");
                         }
                         else
                         {
-                            shaStatusLabel.setText("SHA Status: Existing file found (will update)");
+                            statusArea.append("SHA Status: Existing file found (will update)\n");
                         }
                         saveButton.setEnabled(true);
                         statusLabel.setText("Ready. Fill in what changed and click Save.");
                     }
 
                     @Override
-                    public void onFailure(String errorMessage) 
+                    public void onFailure(String errorMessage)
                     {
                         statusArea.append("Error: " + errorMessage + "\n");
-                        shaStatusLabel.setText("SHA Status: Lookup failed");
+                        statusArea.append("SHA Status: Lookup failed\n");
                         statusLabel.setText("There was a problem preparing your submission. See details below.");
                     }
                 });

@@ -118,7 +118,7 @@ class SubmitNewPathwayDialog extends JDialog
             pack();
         });
 
-        saveButton = new JButton("Save Changes");
+        saveButton = new JButton("Submit Pathway");
         cancelButton = new JButton("Cancel");
         saveButton.setEnabled(false);
 
@@ -179,8 +179,7 @@ class SubmitNewPathwayDialog extends JDialog
     }
     private void showDashboardLink() 
     {
-        JLabel dashboardLink = new JLabel(
-            "<html><a href=''>Your pathway was submitted — see it on the dashboard</a></html>");
+        JLabel dashboardLink = new JLabel("<html><a href=''>see it on the dashboard</a></html>");
         dashboardLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         dashboardLink.addMouseListener(new MouseAdapter() {
             @Override
