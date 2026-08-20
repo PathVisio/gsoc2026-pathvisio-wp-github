@@ -38,7 +38,7 @@ import java.awt.event.MouseEvent;
 class SubmitNewPathwayDialog extends JDialog 
 {
     private final PluginController controller;
-    private static final String UPSTREAM_REPO = "sandbox-wp-db";
+    private final String UPSTREAM_REPO;
     private static final String BASE_BRANCH = "main";
     private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";
     private ForkCheckWorker forkCheckWorker;
@@ -65,7 +65,7 @@ class SubmitNewPathwayDialog extends JDialog
     {
         super(owner, "Submit Pathway", true);
         this.controller = controller;
-
+        this.UPSTREAM_REPO = controller.getUpstreamRepo();
         buildUI();
         populateFromController();
         startForkCheck();

@@ -44,7 +44,7 @@ import java.awt.event.MouseEvent;
  */
 public class CommitExistingPathwayDialog extends JDialog
 {
-    private static final String UPSTREAM_REPO = "sandbox-wp-db";
+    private final String UPSTREAM_REPO;
     private static final String BASE_BRANCH = "main";
     private final PluginController controller;
     private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";   // Theme A, Step 4
@@ -88,7 +88,7 @@ public class CommitExistingPathwayDialog extends JDialog
     {
         super(owner, "Commit to Existing Pathway", true);
         this.controller = controller;
-
+        this.UPSTREAM_REPO = controller.getUpstreamRepo();
         buildUI();
         populateFromController();
         startForkCheck();

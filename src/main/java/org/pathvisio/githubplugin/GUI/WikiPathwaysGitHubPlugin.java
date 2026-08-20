@@ -28,6 +28,9 @@ import javax.swing.Action;
 import java.awt.event.ActionEvent;
 import org.pathvisio.githubplugin.controller.PluginController;
 
+import org.pathvisio.desktop.PreferencesDlg;
+import org.pathvisio.githubplugin.preferences.GitHubRepoPreference;
+
 /**
  * Main plugin class for integrating GitHub and WikiPathways functionality into PathVisio.
  *
@@ -152,6 +155,7 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
      *
      * @param desktop the PathVisio desktop environment, used to register menu actions
      */
+    
     @Override
     public void init(PvDesktop desktop)
     {
@@ -160,7 +164,7 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
         this.desktop = desktop;
         this.controller = new PluginController();
         this.authService = new GitHubAuthService();
-
+        initPluginPreference();
         this.engine = desktop.getSwingEngine().getEngine();
 
         // One-time snapshot: covers the case where a pathway is already open
@@ -194,7 +198,6 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
                         controller.setActiveGpmlFile(null);
                         break;
                     default:
-                        // VPATHWAY_* events not relevant to this wiring — ignored.
                         break;
                 }
             }
@@ -245,7 +248,9 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
                             authDialog.setVisible(true);
                         }
                     });
-                } else {
+                } 
+                else 
+                {
                     AuthDialog authDialog =
                         new AuthDialog(desktop, controller, authService);
                     authDialog.setVisible(true);
@@ -273,5 +278,22 @@ public class WikiPathwaysGitHubPlugin implements Plugin {
     {
         desktop.unregisterMenuAction(MENU_KEY, menuAction);
         engine.removeApplicationEventListener(pathwayListener);
+    }
+
+    /**
+     * Registers this plugin's own settings panel in PathVisio's global
+     * Preferences dialog, exposing the upstream WikiPathways repo as a
+     * user-configurable "Online repository URL" field (Theme F).
+     *
+     * <p>Distinct from and unrelated to {@code PvDesktop}'s own
+     * {@code initPluginPreference()} method of the same name, which
+     * registers PathVisio's plugin-marketplace URL — a different setting
+     * entirely. This method only touches this plugin's own preference.</p>
+     */
+    private void initPluginPreference()
+    {
+        PreferencesDlg dlg = desktop.getPreferencesDlg();
+        dlg.addPanel("WikiPathways GitHub Plugin",
+            dlg.builder().stringField(GitHubRepoPreference.UPSTREAM_REPO, "Online repository URL:").build());
     }
 }

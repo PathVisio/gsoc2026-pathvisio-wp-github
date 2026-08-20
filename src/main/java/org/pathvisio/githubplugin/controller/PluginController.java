@@ -17,8 +17,13 @@
 package org.pathvisio.githubplugin.controller;
 import java.io.File;
 
+import org.pathvisio.githubplugin.service.GitHubAuthService;
+import org.pathvisio.githubplugin.service.GitHubBranchService;
 import org.pathvisio.githubplugin.service.GitHubForkService;
 import org.pathvisio.libgpml.model.PathwayModel;
+
+import org.pathvisio.core.preferences.PreferenceManager;
+import org.pathvisio.githubplugin.preferences.GitHubRepoPreference;
 
 /**
  * Central state container for the PathVisio GitHub integration plugin.
@@ -122,6 +127,18 @@ public class PluginController
         this.confirmedBranch = null;
         this.activeGpmlFile = null;
         this.activePathwayModel = null;
+    }
+    /**
+     * Returns the upstream WikiPathways repo to fork, branch, commit, and
+     * open pull requests against, as configured in PathVisio's Preferences
+     * dialog (Theme F). Falls back to {@code GitHubRepoPreference}'s default
+     * ("sandbox-wp-db") if the user has never changed it.
+     *
+     * @return the configured upstream repo name
+     */
+    public String getUpstreamRepo()
+    {
+        return PreferenceManager.getCurrent().get(GitHubRepoPreference.UPSTREAM_REPO);
     }
 
     /**
