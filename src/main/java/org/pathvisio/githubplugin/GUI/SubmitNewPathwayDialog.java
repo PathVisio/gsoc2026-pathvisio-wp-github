@@ -2,8 +2,10 @@ package org.pathvisio.githubplugin.GUI;
 
 import org.pathvisio.githubplugin.controller.PluginController;
 import org.pathvisio.githubplugin.worker.CommitWorker;
-import org.pathvisio.githubplugin.worker.ForkAndBranchWorker;
-import org.pathvisio.githubplugin.worker.ForkAndBranchWorker.ForkAndBranchCallback;
+import org.pathvisio.githubplugin.worker.ForkCheckWorker;
+import org.pathvisio.githubplugin.worker.ForkCheckWorker.ForkCheckCallback;
+import org.pathvisio.githubplugin.worker.BranchReuseWorker;
+import org.pathvisio.githubplugin.worker.BranchReuseWorker.BranchReuseCallback;
 import org.pathvisio.githubplugin.worker.PullRequestWorker;
 import org.pathvisio.libgpml.model.PathwayModel;
 import org.pathvisio.githubplugin.service.GitHubForkService;
@@ -14,23 +16,33 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.net.URI;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
 
 /**
  * Dialog for submitting a brand-new pathway (no existing WikiPathways entry)
  * to the WikiPathways GitHub repository. Corresponds to Fig 4.5.3.
  *
- * <p>On open, automatically runs {@link ForkAndBranchWorker} in the background
- * to confirm the fork and branch are ready. The "Save Changes" button stays
- * disabled until that succeeds, then commits via {@link CommitWorker} with
- * {@code sha = null} (create flow, since this is always a new file).</p>
- */ 
+ * <p>On open, automatically runs {@link ForkCheckWorker} in the background to
+ * confirm the fork exists and is synced. The "Save Changes" button stays
+ * disabled until that succeeds. On Save click, {@link BranchReuseWorker}
+ * resolves which branch to commit to — reusing an abandoned branch, deleting
+ * and recreating one whose prior PR was merged, or blocking if an earlier PR
+ * is still open — using the fixed placeholder WPID ({@code "WP0001"}, matching
+ * the WikiPathways pathway-portal's own pipeline-mode convention) since no
+ * real WPID exists yet for a new pathway. Commits via {@link CommitWorker}
+ * with {@code sha = null} (create flow, since this is always a new file).</p>
+ */
 class SubmitNewPathwayDialog extends JDialog 
 {
     private final PluginController controller;
     private static final String UPSTREAM_REPO = "sandbox-wp-db";
     private static final String BASE_BRANCH = "main";
-    private ForkAndBranchWorker forkAndBranchWorker;
-
+    private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";
+    private ForkCheckWorker forkCheckWorker;
+    private BranchReuseWorker branchReuseWorker;
     private JTextField titleField;
     private JTextArea descriptionArea;
     private JTextArea statusArea;
@@ -38,10 +50,16 @@ class SubmitNewPathwayDialog extends JDialog
     private JButton cancelButton;
     private JTextField wpidField;
 
+    private JLabel statusLabel;
+    private JPanel statusTextPanel;
+    private JCheckBox showDetailsCheckBox;
+    private JPanel logPanel;
+
     private CommitWorker commitWorker;
     private String confirmedBranch;
     private String repoPath;
     private boolean prInProgress = false;
+    private static final String NEW_PATHWAY_WPID = "WP0001";
 
     public SubmitNewPathwayDialog(Frame owner, PluginController controller)
     {
@@ -50,7 +68,7 @@ class SubmitNewPathwayDialog extends JDialog
 
         buildUI();
         populateFromController();
-        startForkAndBranch();
+        startForkCheck();
     }
 
     private void buildUI() 
@@ -61,7 +79,6 @@ class SubmitNewPathwayDialog extends JDialog
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
         titleField = new JTextField();
-      
         descriptionArea = new JTextArea(3, 30);
         wpidField = new JTextField("(assigned after curator approval)");
         wpidField.setEditable(false);
@@ -78,9 +95,28 @@ class SubmitNewPathwayDialog extends JDialog
         formPanel.add(new JLabel("WPID:"));
         formPanel.add(wpidField);
 
+        statusLabel = new JLabel("Ready.");
+        statusTextPanel = new JPanel();
+        statusTextPanel.setLayout(new BoxLayout(statusTextPanel, BoxLayout.Y_AXIS));
+        statusTextPanel.add(statusLabel);
+
+        showDetailsCheckBox = new JCheckBox("Show details");
+
+        logPanel = new JPanel(new BorderLayout());
+        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
+        logPanel.add(new JScrollPane(statusArea), BorderLayout.CENTER);
+        logPanel.setVisible(false);   // hidden by default
+
         JPanel statusPanel = new JPanel(new BorderLayout());
         statusPanel.setBorder(BorderFactory.createTitledBorder("Status"));
-        statusPanel.add(new JScrollPane(statusArea), BorderLayout.CENTER);
+        statusPanel.add(statusTextPanel, BorderLayout.NORTH);
+        statusPanel.add(showDetailsCheckBox, BorderLayout.CENTER);
+        statusPanel.add(logPanel, BorderLayout.SOUTH);
+
+        showDetailsCheckBox.addItemListener(e -> {
+            logPanel.setVisible(showDetailsCheckBox.isSelected());
+            pack();
+        });
 
         saveButton = new JButton("Save Changes");
         cancelButton = new JButton("Cancel");
@@ -95,9 +131,13 @@ class SubmitNewPathwayDialog extends JDialog
             {
                 return;
             }
-            if (forkAndBranchWorker != null)
+            if (forkCheckWorker != null)
             {
-                forkAndBranchWorker.cancel(true);
+                forkCheckWorker.cancel(true);
+            }
+            if (branchReuseWorker != null)
+            {
+                branchReuseWorker.cancel(true);
             }
             if (commitWorker != null)
             {
@@ -115,128 +155,60 @@ class SubmitNewPathwayDialog extends JDialog
                 {
                     return;
                 }
-                if (forkAndBranchWorker != null) 
-                {
-                    forkAndBranchWorker.cancel(true);
-                }
-                if (commitWorker != null)
-                {
-                    commitWorker.cancel(true);
-                }
+            if (forkCheckWorker != null)
+            {
+                forkCheckWorker.cancel(true);
+            }
+            if (branchReuseWorker != null)
+            {
+                branchReuseWorker.cancel(true);
+            }
+            if (commitWorker != null)
+            {
+                commitWorker.cancel(true);
+            }
                 dispose();
             }
         });
-
-        saveButton.addActionListener(e -> {
-            if (repoPath == null)
-            {
-                String sanitizedTitle = sanitizeTitle(titleField.getText());
-                repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
-            }
-
-            
-            String commitTitle = "New pathway: " + titleField.getText();
-
-            commitWorker = new CommitWorker(
-                controller.getAccessToken(),
-                controller.getAuthenticatedUsername(),
-                UPSTREAM_REPO,
-                confirmedBranch,
-                repoPath,
-                controller.getActivePathwayModel(),
-                null, // sha — always null, this is the create flow
-                commitTitle,  
-                new CommitWorker.CommitCallback() {
-                    @Override
-                    public void onStatusUpdate(String message) 
-                    {
-                        statusArea.append(message + "\n");
-                    }
-                    
-                    @Override
-                    public void onConflict() 
-                    {
-                        statusArea.append("Conflict: file was modified concurrently.\n");
-                    }
-                    
-                    @Override
-                    public void onSuccess(String newSha) 
-                    {
-                        statusArea.append("Commit successful. New SHA: " + newSha + "\n");
-                        String prTitle = "Contribution: " + titleField.getText();
-                        String prBody = descriptionArea.getText();
-                        
-                        PullRequestWorker pullRequestWorker = new PullRequestWorker(
-                            controller.getAccessToken(),
-                            GitHubForkService.getUpstreamOwner(),
-                            UPSTREAM_REPO,
-                            controller.getAuthenticatedUsername(),
-                            confirmedBranch,
-                            BASE_BRANCH,
-                            prTitle,
-                            prBody,
-                            new PullRequestWorker.PullRequestCallback()
-                            {
-                                @Override
-                                public void onStatusUpdate(String message) 
-                                {
-                                    statusArea.append(message + "\n");
-                                }
-
-                                @Override
-                                public void onSuccess(PullRequestResult result) 
-                                {
-                                    statusArea.append("Pull request #" + result.getNumber() + " created.\n");
-                                    statusArea.append(result.getHtmlUrl() + "\n");
-                                    saveButton.setEnabled(false);
-                                    prInProgress = false;
-                                    cancelButton.setEnabled(true);
-                                    cancelButton.setText("Close");
-                                }
-                            
-                                @Override
-                                public void onValidationFailure(String message) 
-                                {
-                                    statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
-                                    saveButton.setEnabled(false);
-                                    prInProgress = false;
-                                    cancelButton.setEnabled(true);
-                                    cancelButton.setText("Close");
-                                }
-
-                                @Override
-                                public void onFailure(String errorMessage)
-                                {
-                                    statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + errorMessage + "\n");
-                                    saveButton.setEnabled(false);
-                                    prInProgress = false;
-                                    cancelButton.setEnabled(true);
-                                    cancelButton.setText("Close");
-                                }
-                            }
-                        );
-                        
-                        prInProgress = true;
-                        cancelButton.setEnabled(false);
-                        pullRequestWorker.execute();
-                    }
-
-                    @Override
-                    public void onFailure(String errorMessage) 
-                    {
-                        statusArea.append("Commit failed: " + errorMessage + "\n");
-                    }
-                }
-            );
-            
-            commitWorker.execute();
-        });
-
+        saveButton.addActionListener(e -> startBranchReuseCheck());
         add(formPanel, BorderLayout.NORTH);
         add(statusPanel, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
         pack();
         setLocationRelativeTo(getOwner());
+    }
+    private void showDashboardLink() 
+    {
+        JLabel dashboardLink = new JLabel(
+            "<html><a href=''>Your pathway was submitted — see it on the dashboard</a></html>");
+        dashboardLink.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        dashboardLink.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) 
+            {
+                if (Desktop.isDesktopSupported()) 
+                {
+                    try 
+                    {
+                        Desktop.getDesktop().browse(new URI(DASHBOARD_URL));
+                    } 
+                    catch (Exception ex) 
+                    {
+                        statusArea.append("Could not open link: " + ex.getMessage() + "\n");
+                    }
+                } 
+                else 
+                {
+                    statusArea.append("Open this link in your browser: " + DASHBOARD_URL + "\n");
+                }
+            }
+        });
+
+        statusLabel.setText("Your pathway was submitted for review.");
+        statusLabel.setIcon(null);
+        statusTextPanel.add(dashboardLink);
+        statusTextPanel.revalidate();
+        statusTextPanel.repaint();
     }
 
     private void populateFromController() 
@@ -296,45 +268,205 @@ class SubmitNewPathwayDialog extends JDialog
         return "pathways/" + baseName + "/" + fileName;
     }
 
-    private void startForkAndBranch() 
+    private void startForkCheck()
     {
-        forkAndBranchWorker = new ForkAndBranchWorker
-        (
+        statusLabel.setText("Checking if your submission is ready...");
+
+        forkCheckWorker = new ForkCheckWorker(
+                controller.getAccessToken(),
+                controller.getAuthenticatedUsername(),
+                UPSTREAM_REPO,
+                new ForkCheckCallback()
+                {
+                    @Override
+                    public void onStatusUpdate(String message)
+                    {
+                        statusArea.append(message + "\n");
+                    }
+
+                    @Override
+                    public void onConflict()
+                    {
+                        statusArea.append("Fork has diverged and could not be synced.\n");
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
+                    }
+
+                    @Override
+                    public void onSuccess()
+                    {
+                        controller.setForkReady(true);
+                        statusArea.append("Fork ready.\n");
+                        saveButton.setEnabled(true);
+                        statusLabel.setText("Ready. Fill in the details and click Save.");
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage)
+                    {
+                        statusArea.append("Error: " + errorMessage + "\n");
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
+                    }
+                });
+        forkCheckWorker.execute();
+    }
+
+    private void startCommit()
+    {
+        saveButton.setEnabled(false);
+
+        if (repoPath == null)
+        {
+            String sanitizedTitle = sanitizeTitle(titleField.getText());
+            repoPath = "pathways/" + sanitizedTitle + "/" + sanitizedTitle + ".gpml";
+        }
+
+        statusLabel.setText("Saving your changes...");
+        String commitTitle = "New pathway: " + titleField.getText();
+
+        commitWorker = new CommitWorker(
             controller.getAccessToken(),
             controller.getAuthenticatedUsername(),
-            UPSTREAM_REPO, 
-            null,
-            new ForkAndBranchCallback() 
-            {
+            UPSTREAM_REPO,
+            confirmedBranch,
+            repoPath,
+            controller.getActivePathwayModel(),
+            null, // sha — always null, this is the create flow
+            commitTitle,
+            new CommitWorker.CommitCallback() {
                 @Override
-                public void onStatusUpdate(String message) 
+                public void onStatusUpdate(String message)
                 {
                     statusArea.append(message + "\n");
                 }
 
                 @Override
-                public void onConflict() 
+                public void onConflict()
                 {
-                    statusArea.append("Fork has diverged and could not be synced.\n");
+                    statusArea.append("Conflict: file was modified concurrently.\n");
+                    statusLabel.setText("Someone else has changed this pathway. Please close this window and try again.");
                 }
 
                 @Override
-                public void onSuccess(String branchName) 
+                public void onSuccess(String newSha)
                 {
-                    confirmedBranch = branchName;
-                    controller.setConfirmedBranch(branchName);
-                    controller.setForkReady(true);
-                    statusArea.append("Branch ready: " + branchName + "\n");
-                    saveButton.setEnabled(true);
+                    statusArea.append("Commit successful. New SHA: " + newSha + "\n");
+                    statusLabel.setText("Your changes were saved. Submitting for review...");
+
+                    String prTitle = "Contribution: " + titleField.getText();
+                    String prBody = descriptionArea.getText();
+
+                    PullRequestWorker pullRequestWorker = new PullRequestWorker(
+                        controller.getAccessToken(),
+                        GitHubForkService.getUpstreamOwner(),
+                        UPSTREAM_REPO,
+                        controller.getAuthenticatedUsername(),
+                        confirmedBranch,
+                        BASE_BRANCH,
+                        prTitle,
+                        prBody,
+                        new PullRequestWorker.PullRequestCallback()
+                        {
+                            @Override
+                            public void onStatusUpdate(String message)
+                            {
+                                statusArea.append(message + "\n");
+                            }
+
+                            @Override
+                            public void onSuccess(PullRequestResult result)
+                            {
+                                statusArea.append("Pull request #" + result.getNumber() + " created.\n");
+                                statusArea.append(result.getHtmlUrl() + "\n");
+                                saveButton.setEnabled(false);
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                                showDashboardLink();
+                            }
+
+                            @Override
+                            public void onValidationFailure(String message)
+                            {
+                                statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + message + "\n");
+                                saveButton.setEnabled(false);
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                                statusLabel.setText("Your changes were saved, but the submission for review failed. See details below.");
+                            }
+
+                            @Override
+                            public void onFailure(String errorMessage)
+                            {
+                                statusArea.append("Committed (SHA: " + newSha + "), but PR creation failed: " + errorMessage + "\n");
+                                saveButton.setEnabled(false);
+                                prInProgress = false;
+                                cancelButton.setEnabled(true);
+                                cancelButton.setText("Close");
+                                statusLabel.setText("Your changes were saved, but the submission for review failed. See details below.");
+                            }
+                        }
+                    );
+
+                    prInProgress = true;
+                    cancelButton.setEnabled(false);
+                    pullRequestWorker.execute();
                 }
 
                 @Override
-                public void onFailure(String errorMessage) 
+                public void onFailure(String errorMessage)
                 {
-                    statusArea.append("Error: " + errorMessage + "\n");
+                    statusArea.append("Commit failed: " + errorMessage + "\n");
+                    statusLabel.setText("There was a problem preparing your submission. See details below.");
                 }
             }
         );
-        forkAndBranchWorker.execute(); 
+
+        commitWorker.execute();
+    }
+
+    private void startBranchReuseCheck()
+    {
+        saveButton.setEnabled(false);
+        statusLabel.setText("Checking branch status...");
+
+        branchReuseWorker = new BranchReuseWorker(
+                controller.getAccessToken(),
+                controller.getAuthenticatedUsername(),
+                UPSTREAM_REPO,
+                NEW_PATHWAY_WPID,
+                new BranchReuseCallback()
+                {
+                    @Override
+                    public void onStatusUpdate(String message)
+                    {
+                        statusArea.append(message + "\n");
+                    }
+
+                    @Override
+                    public void onBlocked(String reason)
+                    {
+                        statusArea.append("Blocked: " + reason + "\n");
+                        statusLabel.setText(reason);
+                    }
+
+                    @Override
+                    public void onSuccess(String branchName)
+                    {
+                        confirmedBranch = branchName;
+                        controller.setConfirmedBranch(branchName);
+                        statusArea.append("Branch ready: " + branchName + "\n");
+                        startCommit();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage)
+                    {
+                        statusArea.append("Error: " + errorMessage + "\n");
+                        saveButton.setEnabled(true);
+                        statusLabel.setText("There was a problem preparing your submission. See details below.");
+                    }
+                });
+        branchReuseWorker.execute();
     }
 }
