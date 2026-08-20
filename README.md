@@ -23,7 +23,7 @@ Specific goals for the GSoC period:
 
 ## What I Did
 
-### Phase 1–2: Authentication & Encoding (May–June)
+### Authentication & Encoding (May–June)
 - Implemented GitHub OAuth 2.0 Device Authorization Grant (RFC 8628) for an in-app authentication, avoiding manual token handling by the user.
 - Built the GPML encoding layer needed to prepare pathway files for commit.
 - Core classes: `GitHubAuthService`, `TokenManager`, `JsonParser`, `GpmlEncoder`.
