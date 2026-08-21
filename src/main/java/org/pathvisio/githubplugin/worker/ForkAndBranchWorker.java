@@ -84,7 +84,7 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
             else 
             {
                 throw new IOException("Unexpected sync result: " + syncResult);
-        }
+            }
             String branchName;
             if (desiredBranchName == null || desiredBranchName.trim().isEmpty()) 
             {

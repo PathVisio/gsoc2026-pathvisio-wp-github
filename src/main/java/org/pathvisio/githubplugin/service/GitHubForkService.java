@@ -57,7 +57,7 @@ import java.net.HttpURLConnection;
  * <pre>
  * String accessToken = "ghp_...";
  * String username = "alice";
- * String repoName = "sandbox-wp-db";
+ * 
  * 
  * GitHubForkService forkService = new GitHubForkService(accessToken, username, repoName);
  * 
