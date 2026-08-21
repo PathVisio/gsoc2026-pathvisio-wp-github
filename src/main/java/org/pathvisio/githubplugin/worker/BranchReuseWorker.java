@@ -16,6 +16,7 @@ public class BranchReuseWorker extends SwingWorker<String, String>
 {
     private final String accessToken;
     private final String authenticatedUsername;
+    private final String upstreamOwner;
     private final String upstreamRepo;
     private final String wpid;
     private final BranchReuseCallback callback;
@@ -25,11 +26,11 @@ public class BranchReuseWorker extends SwingWorker<String, String>
         BlockedException(String message) { super(message); }
     }
 
-    public BranchReuseWorker(String accessToken, String authenticatedUsername,
-            String upstreamRepo, String wpid, BranchReuseCallback callback)
+    public BranchReuseWorker(String accessToken, String authenticatedUsername,String upstreamOwner, String upstreamRepo, String wpid, BranchReuseCallback callback)
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
         this.wpid = wpid;
         this.callback = callback;
@@ -39,7 +40,7 @@ public class BranchReuseWorker extends SwingWorker<String, String>
     protected String doInBackground() throws Exception
     {
         GitHubBranchService branchService = new GitHubBranchService(accessToken, authenticatedUsername, upstreamRepo);
-        GitHubPullService pullService = new GitHubPullService(GitHubForkService.getUpstreamOwner(), upstreamRepo, authenticatedUsername, accessToken);
+        GitHubPullService pullService = new GitHubPullService(upstreamOwner, upstreamRepo, authenticatedUsername, accessToken);
 
         String prefix = wpid + "_" + authenticatedUsername + "_";
 
@@ -70,7 +71,7 @@ public class BranchReuseWorker extends SwingWorker<String, String>
         }
 
         publish("Creating a new branch...");
-        String defaultBranch = branchService.getDefaultBranch(GitHubForkService.getUpstreamOwner());
+        String defaultBranch = branchService.getDefaultBranch(upstreamOwner);
         String headSha = branchService.getHeadSHA(defaultBranch);
         String newBranchName = wpid + "_" + authenticatedUsername + "_" + generateTimestamp();
         branchService.createBranch(newBranchName, headSha);

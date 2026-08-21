@@ -20,8 +20,10 @@ import java.io.File;
 import org.pathvisio.githubplugin.service.GitHubAuthService;
 import org.pathvisio.githubplugin.service.GitHubBranchService;
 import org.pathvisio.githubplugin.service.GitHubForkService;
+import org.pathvisio.githubplugin.util.GitHubUrlParser;
 import org.pathvisio.libgpml.model.PathwayModel;
 
+import org.pathvisio.githubplugin.util.GitHubUrlParser;
 import org.pathvisio.core.preferences.PreferenceManager;
 import org.pathvisio.githubplugin.preferences.GitHubRepoPreference;
 
@@ -129,16 +131,33 @@ public class PluginController
         this.activePathwayModel = null;
     }
     /**
-     * Returns the upstream WikiPathways repo to fork, branch, commit, and
-     * open pull requests against, as configured in PathVisio's Preferences
-     * dialog (Theme F). Falls back to {@code GitHubRepoPreference}'s default
-     * ("sandbox-wp-db") if the user has never changed it.
+     * Returns the repo name portion of the upstream repository URL configured
+     * in PathVisio's Preferences dialog (Theme F / Theme G).
      *
-     * @return the configured upstream repo name
+     * @return the parsed repo name (e.g. "sandbox-wp-db")
+     * @throws IllegalArgumentException if the stored preference is not a
+     *         well-formed https://github.com/owner/repo URL
      */
     public String getUpstreamRepo()
     {
-        return PreferenceManager.getCurrent().get(GitHubRepoPreference.UPSTREAM_REPO);
+        String url = PreferenceManager.getCurrent().get(GitHubRepoPreference.UPSTREAM_REPO);
+        GitHubUrlParser.OwnerRepo parsed = GitHubUrlParser.parse(url);
+        return parsed.repo;
+    }
+
+    /**
+     * Returns the owner portion of the upstream repository URL configured
+     * in PathVisio's Preferences dialog (Theme F / Theme G).
+     *
+     * @return the parsed owner (e.g. "wikipathways")
+     * @throws IllegalArgumentException if the stored preference is not a
+     *         well-formed https://github.com/owner/repo URL
+     */
+    public String getUpstreamOwner()
+    {
+        String url = PreferenceManager.getCurrent().get(GitHubRepoPreference.UPSTREAM_REPO);
+        GitHubUrlParser.OwnerRepo parsed = GitHubUrlParser.parse(url);
+        return parsed.owner;
     }
 
     /**

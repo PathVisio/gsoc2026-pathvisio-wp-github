@@ -18,6 +18,7 @@ public class ForkCheckWorker extends SwingWorker<Void, String>
 {
     private final String accessToken;
     private final String authenticatedUsername;
+    private final String upstreamOwner;
     private final String upstreamRepo;
     private final ForkCheckCallback callback;
 
@@ -26,11 +27,11 @@ public class ForkCheckWorker extends SwingWorker<Void, String>
         ForkConflictException(String message) { super(message); }
     }
 
-    public ForkCheckWorker(String accessToken, String authenticatedUsername,
-            String upstreamRepo, ForkCheckCallback callback)
+    public ForkCheckWorker(String accessToken, String authenticatedUsername, String upstreamOwner, String upstreamRepo, ForkCheckCallback callback)
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
         this.callback = callback;
     }
@@ -38,10 +39,8 @@ public class ForkCheckWorker extends SwingWorker<Void, String>
     @Override
     protected Void doInBackground() throws Exception
     {
-        GitHubForkService forkService =
-            new GitHubForkService(accessToken, authenticatedUsername, upstreamRepo);
-        GitHubForkSyncService syncService =
-            new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamRepo);
+        GitHubForkService forkService = new GitHubForkService(accessToken, authenticatedUsername, upstreamOwner, upstreamRepo);
+        GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamRepo);
 
         publish("Checking fork...");
         boolean forkReady = forkService.ensureForkExists();

@@ -39,6 +39,7 @@ class SubmitNewPathwayDialog extends JDialog
 {
     private final PluginController controller;
     private final String UPSTREAM_REPO;
+    private final String UPSTREAM_OWNER;
     private static final String BASE_BRANCH = "main";
     private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";
     private ForkCheckWorker forkCheckWorker;
@@ -66,12 +67,13 @@ class SubmitNewPathwayDialog extends JDialog
         super(owner, "Submit Pathway", true);
         this.controller = controller;
         this.UPSTREAM_REPO = controller.getUpstreamRepo();
+        this.UPSTREAM_OWNER = controller.getUpstreamOwner();
         buildUI();
         populateFromController();
         startForkCheck();
     }
 
-    private void buildUI() 
+    private void buildUI()
     {
         setLayout(new BorderLayout(10, 10));
 
@@ -274,6 +276,7 @@ class SubmitNewPathwayDialog extends JDialog
         forkCheckWorker = new ForkCheckWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
+                UPSTREAM_OWNER,
                 UPSTREAM_REPO,
                 new ForkCheckCallback()
                 {
@@ -356,7 +359,7 @@ class SubmitNewPathwayDialog extends JDialog
 
                     PullRequestWorker pullRequestWorker = new PullRequestWorker(
                         controller.getAccessToken(),
-                        GitHubForkService.getUpstreamOwner(),
+                        UPSTREAM_OWNER,
                         UPSTREAM_REPO,
                         controller.getAuthenticatedUsername(),
                         confirmedBranch,
@@ -432,6 +435,7 @@ class SubmitNewPathwayDialog extends JDialog
         branchReuseWorker = new BranchReuseWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
+                UPSTREAM_OWNER,
                 UPSTREAM_REPO,
                 NEW_PATHWAY_WPID,
                 new BranchReuseCallback()

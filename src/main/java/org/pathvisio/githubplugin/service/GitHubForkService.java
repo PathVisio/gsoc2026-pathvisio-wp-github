@@ -87,8 +87,7 @@ import java.net.HttpURLConnection;
 public class GitHubForkService
 {
     private static final String API_BASE       = "https://api.github.com";
-    private static final String UPSTREAM_OWNER = "wikipathways";
-   
+    private final String upstreamOwner;
     private final String accessToken;
     private final String authenticatedUsername;
     private final String upstreamRepo;
@@ -100,15 +99,12 @@ public class GitHubForkService
      * @param authenticatedUsername the GitHub username of the token owner (e.g., "alice")
      * @param upstreamRepo          the name of the repository to fork (e.g., "sandbox-wp-db")
      */
-    public GitHubForkService(String accessToken, String authenticatedUsername, String upstreamRepo) 
+    public GitHubForkService(String accessToken, String authenticatedUsername, String upstreamOwner, String upstreamRepo) 
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
-    }
-    public static String getUpstreamOwner() 
-    {
-        return UPSTREAM_OWNER;
     }
 
     /**
@@ -148,14 +144,14 @@ public class GitHubForkService
      */
     public void createFork() throws IOException
     {
-        String endpoint = API_BASE + "/repos/" + UPSTREAM_OWNER + "/" + upstreamRepo + "/forks";
+        String endpoint = API_BASE + "/repos/" + upstreamOwner + "/" + upstreamRepo + "/forks";
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "POST", accessToken);
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
         connection.getOutputStream().write("{}".getBytes("UTF-8"));
         int status = connection.getResponseCode();
         connection.disconnect();
-         if (status != 202 && status != 200) 
+        if (status != 202 && status != 200) 
         {
             throw new IOException("Fork creation failed. GitHub returned: " + status);
         }
@@ -200,14 +196,14 @@ public class GitHubForkService
     /**
      * Ensures that a fork of the upstream repository exists, creating one if necessary and
      * waiting for it to become ready.
-     * 
+     *
      * <p>This is a convenience method that combines the three-step fork workflow:</p>
      * <ol>
      * <li>Check if the fork already exists using {@link #forkExists()}</li>
      * <li>If missing, create it using {@link #createFork()}</li>
      * <li>Poll until ready using {@link #waitForFork(long, long)} (60-second timeout, 3-second intervals)</li>
      * </ol>
-     * 
+     *
      * <p><strong>Threading:</strong> This method blocks the calling thread. It <em>must</em> be called
      * from a background thread (e.g., {@link javax.swing.SwingWorker}), never from the Event Dispatch
      * Thread (EDT).</p>
@@ -217,10 +213,10 @@ public class GitHubForkService
      * @throws IOException            if the GitHub API returns an unexpected status code
      * @throws InterruptedException   if the calling thread is interrupted while waiting
      */
-     public boolean ensureForkExists() throws IOException, InterruptedException
-     {
+    public boolean ensureForkExists() throws IOException, InterruptedException
+    {
         if (forkExists()) return true;
         createFork();
         return waitForFork(60_000, 3_000);
-     }
+    }
 }

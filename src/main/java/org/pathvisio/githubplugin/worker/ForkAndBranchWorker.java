@@ -23,6 +23,7 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
 
     private final String accessToken;
     private final String authenticatedUsername;
+    private final String upstreamOwner;
     private final String upstreamRepo;
     private final String desiredBranchName;
     private final ForkAndBranchCallback callback;
@@ -38,10 +39,11 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
             super(message);
         }
     }
-    public ForkAndBranchWorker(String accessToken, String authenticatedUsername,String upstreamRepo, String desiredBranchName,ForkAndBranchCallback callback) 
+    public ForkAndBranchWorker(String accessToken, String authenticatedUsername,String upstreamOwner, String upstreamRepo, String desiredBranchName,ForkAndBranchCallback callback) 
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
         this.desiredBranchName = desiredBranchName;
         this.callback = callback;
@@ -49,7 +51,7 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
     @Override
     protected String doInBackground() throws Exception 
     {
-        GitHubForkService forkService = new GitHubForkService(accessToken, authenticatedUsername, upstreamRepo);
+        GitHubForkService forkService = new GitHubForkService(accessToken, authenticatedUsername,upstreamOwner, upstreamRepo);
         GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamRepo);
         GitHubBranchService branchService = new GitHubBranchService(accessToken, authenticatedUsername, upstreamRepo);
 
@@ -95,7 +97,6 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
                 branchName = desiredBranchName.trim();
             }
             publish("Checking branch...");
-            String upstreamOwner = GitHubForkService.getUpstreamOwner();
             branchService.ensureBranchExists(upstreamOwner, branchName);
             publish("Branch ready");
 

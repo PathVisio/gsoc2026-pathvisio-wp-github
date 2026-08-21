@@ -89,7 +89,7 @@ public class PathVisioGitHubCli2
             System.out.println("    -> Logged in as: " + username);
 
             System.out.println("[3/6] Ensuring fork of " + UPSTREAM_OWNER + "/" + UPSTREAM_REPO + " exists...");
-            GitHubForkService forkService = new GitHubForkService(token, username, UPSTREAM_REPO);
+            GitHubForkService forkService = new GitHubForkService(token, username, UPSTREAM_OWNER, UPSTREAM_REPO);
 
             if (forkService.forkExists())
             {

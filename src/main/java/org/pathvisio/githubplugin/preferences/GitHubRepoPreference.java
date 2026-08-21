@@ -13,7 +13,7 @@ import org.pathvisio.core.preferences.Preference;
  */
 public enum GitHubRepoPreference implements Preference
 {
-    UPSTREAM_REPO("sandbox-wp-db");
+    UPSTREAM_REPO("https://github.com/wikipathways/sandbox-wp-db");
 
     private final String defaultValue;
 

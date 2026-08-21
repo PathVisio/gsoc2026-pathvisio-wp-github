@@ -45,6 +45,7 @@ import java.awt.event.MouseEvent;
 public class CommitExistingPathwayDialog extends JDialog
 {
     private final String UPSTREAM_REPO;
+    private final String UPSTREAM_OWNER;
     private static final String BASE_BRANCH = "main";
     private final PluginController controller;
     private static final String DASHBOARD_URL = "https://upload.wikipathways.org/dashboard?mine=1";   // Theme A, Step 4
@@ -88,6 +89,7 @@ public class CommitExistingPathwayDialog extends JDialog
         super(owner, "Commit to Existing Pathway", true);
         this.controller = controller;
         this.UPSTREAM_REPO = controller.getUpstreamRepo();
+        this.UPSTREAM_OWNER = controller.getUpstreamOwner();
         buildUI();
         populateFromController();
         startForkCheck();
@@ -329,6 +331,7 @@ public class CommitExistingPathwayDialog extends JDialog
         forkCheckWorker = new ForkCheckWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
+                UPSTREAM_OWNER,
                 UPSTREAM_REPO,
                 new ForkCheckCallback()
                 {
@@ -411,7 +414,7 @@ public class CommitExistingPathwayDialog extends JDialog
 
                     PullRequestWorker pullRequestWorker = new PullRequestWorker(
                         controller.getAccessToken(),
-                        GitHubForkService.getUpstreamOwner(),
+                        UPSTREAM_OWNER,
                         UPSTREAM_REPO,
                         controller.getAuthenticatedUsername(),
                         confirmedBranch,
@@ -491,6 +494,7 @@ public class CommitExistingPathwayDialog extends JDialog
         branchReuseWorker = new BranchReuseWorker(
                 controller.getAccessToken(),
                 controller.getAuthenticatedUsername(),
+                UPSTREAM_OWNER,
                 UPSTREAM_REPO,
                 wpidField.getText(),
                 new BranchReuseCallback()
