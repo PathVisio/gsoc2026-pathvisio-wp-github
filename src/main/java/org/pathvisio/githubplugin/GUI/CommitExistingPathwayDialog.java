@@ -118,7 +118,7 @@ public class CommitExistingPathwayDialog extends JDialog
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
 
-        descriptionArea = new JTextArea(1, 30);
+        descriptionArea = new JTextArea(4, 30);
         statusArea = new JTextArea(4, 30);
         statusArea.setEditable(false);
         statusArea.setText("Ready.");
@@ -143,6 +143,7 @@ public class CommitExistingPathwayDialog extends JDialog
         whatChangedPanel.add(otherCheckBox);
     
         JLabel commentLabel = new JLabel("Additional Comment:");
+        formPanel.add(whatChangedPanel);
         formPanel.add(commentLabel);
         formPanel.add(new JScrollPane(descriptionArea));
 
@@ -216,8 +217,12 @@ public class CommitExistingPathwayDialog extends JDialog
 
     saveButton.addActionListener(e -> startBranchReuseCheck());
 
-        add(contextPanel, BorderLayout.NORTH);
-        add(formPanel, BorderLayout.CENTER);
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+        topPanel.add(contextPanel);
+        topPanel.add(formPanel);
+
+        add(topPanel, BorderLayout.NORTH);
         add(southPanel, BorderLayout.SOUTH);
 
         pack();
