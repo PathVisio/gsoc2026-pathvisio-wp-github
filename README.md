@@ -71,10 +71,6 @@ This is not a limitation of the finished plugin. As described earlier, the targe
 
 ## What's Left to Do
 
-**UI polish.** Minor refinements remain in both submission dialogs: button label wording and layout adjustments. This is cosmetic, not functional err and the underlying logic in both flows is complete and tested.
-
-**GitHub Actions validation pipeline.** A GPML schema and metadata-completeness validation pipeline, originally scoped as part of this project's proposal, may be handled separately as part of the pathway-portal infrastructure. This was a deliberate scope decision, not a dropped task as the plugin's own build/CI pipeline is unrelated and already working.
-
 **Pull requests not appearing on pathway portal's dashboard.** Investigation traced this to an architectural boundary rather than a bug, the portal's dashboard reads exclusively from its own internal database, which is only populated when a submission goes through the portal's own web-based submission flow. A pull request opened directly via the GitHub API, which is how this plugin submits, thus it has no path into that database regardless of which repository or account it targets. This is now understood and root-caused, not an open question.
 
 **`ForkAndBranchWorker.java`.** Both submission dialogs have been migrated to the newer fork-check and branch-reuse workers, and this class is now unreferenced anywhere in the plugin or its CLI tools. It has not yet been deleted, since the question of whether it's safe to remove was already raised with the mentors; deletion is planned as a final cleanup step once that's confirmed.
@@ -171,4 +167,15 @@ Once built, the plugin jar can be installed through PathVisio's own Plugins menu
 
 ## Extending the plugin
 
-The fork, branch, commit, and pull-request logic lives in `org.pathvisio.githubplugin.service`; the two submission dialogs live under the UI layer and drive that service layer through `ForkCheckWorker` and `BranchReuseWorker` (both `SwingWorker` subclasses, keeping GitHub API calls off the Swing Event Dispatch Thread). The target repository is read at runtime via `PluginController.getUpstreamRepo()`, backed by a PathVisio preference — see the Configuration section above for how to point the plugin at a different repository without code changes.
+The fork, branch, commit, and pull-request logic lives in `org.pathvisio.githubplugin.service`; the two submission dialogs live under the UI layer and drive that service layer through `ForkCheckWorker` and `BranchReuseWorker` (both `SwingWorker` subclasses, keeping GitHub API calls off the Swing Event Dispatch Thread). The upstream repository of both owner and repo name is read at runtime from a single configurable URL (e.g. `https://github.com/owner/repo`) via `PluginController.getUpstreamOwner()` / `getUpstreamRepo()`, backed by a PathVisio preference (Preferences → WikiPathways GitHub Plugin → "Online repository URL"). This lets the plugin target any upstream repository without code changes.
+
+## Known Limitations
+ 
+**Fork name collisions across different upstream owners.** The plugin identifies a user's fork purely by repository name  `github.com/{yourUsername}/{upstreamRepo}` and does not currently support forking two different upstream repositories that happen to share the exact same repo name under different owners (e.g. `ownerA/sandbox-wp-db` and `ownerB/sandbox-wp-db`). If you already have a fork of one such repository and then point the plugin's preference at a different upstream repo with the same name, the plugin will detect the mismatch at the fork-check step and report a clear error rather than silently using the wrong fork but it cannot resolve the conflict automatically.
+ 
+To switch between upstream repositories with colliding names, resolve the conflict locally first:
+1. Go to `github.com/{yourUsername}/{upstreamRepo}` and confirm it's the fork you no longer need (check the "forked from" text under the repo name).
+2. Either delete that repository (Settings → Danger Zone → Delete this repository), or rename it (Settings → Repository name) to free up the name.
+3. Point the plugin's Preferences URL at the new upstream and reopen the submission dialog — it will create a fresh fork under the now-available name.
+This does not affect the common case of switching between upstream repositories with distinct names, which works without any manual cleanup.
+ 

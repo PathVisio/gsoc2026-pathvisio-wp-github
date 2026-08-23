@@ -77,7 +77,7 @@ print once it loads.
 inside the plugin project
 
 ```bash
-cd "/mnt/c/Users/sneha/OneDrive/Desktop/PATHVISIO GITHUB PLUGIN"
+cd "your-file-location"
 mvn clean package
 ```
 
@@ -98,10 +98,7 @@ With PathVisio's Swing UI still open from Step 2:
 2. Find the **Install local plugins** action (exact submenu wording/path not
    yet confirmed on your machine — first time trying this, so note down
    exactly what you see under **Plugins** if it isn't a direct menu item).
-3. Point the file browser at:
-   ```
-   C:\Users\sneha\OneDrive\Desktop\PATHVISIO GITHUB PLUGIN\target
-   ```
+3. Point the file browser at your file's location. Make sure it is pointing to where the target is getting built. 
 4. Watch the **PowerShell console from Step 2** for your temporary log line:
    ```
    WikiPathwaysGitHubPlugin.init() called - plugin loaded successfully
