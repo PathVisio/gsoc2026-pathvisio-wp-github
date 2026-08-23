@@ -17,8 +17,11 @@
 package org.pathvisio.githubplugin.service;
 
 import org.pathvisio.githubplugin.util.HttpUtil;
+import org.pathvisio.githubplugin.util.JsonParser;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import org.pathvisio.githubplugin.util.JsonParser;
 
 /**
  * Service class for managing GitHub fork operations.
@@ -106,10 +109,21 @@ public class GitHubForkService
         this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
     }
-
+    /**
+     * Thrown when a repo of the expected name exists under the authenticated
+     * user's account, but its actual GitHub-registered fork parent does not
+     * match the currently configured upstream owner/repo.
+     */
+    public static class ForkParentMismatchException extends IOException
+    {
+        public ForkParentMismatchException(String message)
+        {
+            super(message);
+        }
+    }
     /**
      * Checks whether a fork of the upstream repository exists under the authenticated user's account.
-     * 
+     *
      * <p>This method queries the GitHub API to determine if the fork is currently accessible.
      * It does not guarantee that the fork is immediately ready for all operations; use
      * {@link #waitForFork(long, long)} to wait for full initialization.</p>
@@ -122,20 +136,45 @@ public class GitHubForkService
         String endpoint = API_BASE + "/repos/" + authenticatedUsername + "/" + upstreamRepo;
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", accessToken);
         int status = connection.getResponseCode();
+
+        if (status == 404) 
+        {
+            connection.disconnect();
+            return false;
+        }
+
+        if (status != 200) 
+        {
+            connection.disconnect();
+            throw new IOException("Unexpected status while checking fork: " + status);
+        }
+
+        String body = HttpUtil.readResponseBody(connection);
         connection.disconnect();
-        if (status == 200) return true;
-        if (status == 404) return false;
-        throw new IOException("Unexpected status while checking fork: " + status);
+
+        String actualParent = JsonParser.extractNestedValue(body, "parent", "full_name");
+        String expectedParent = upstreamOwner + "/" + upstreamRepo;
+
+        if (actualParent == null || !actualParent.equals(expectedParent)) 
+        {
+            throw new ForkParentMismatchException(
+                "A repo named \"" + upstreamRepo + "\" already exists under your account, "
+                + "but it is not a fork of " + expectedParent
+                + (actualParent == null ? " (it has no fork parent at all)." : " (its actual parent is " + actualParent + ").")
+                + " Rename or delete this repo, or point the plugin at a different upstream.");
+        }
+
+        return true;
     }
 
     /**
      * Creates a new fork of the upstream repository in the authenticated user's account.
-     * 
+     *
      * <p>This operation is <em>asynchronous</em> on GitHub's side. A successful response
      * (HTTP 200 or 202) indicates that the fork request was accepted, but the fork may not
      * be immediately queryable via the API. Call {@link #waitForFork(long, long)} to wait
      * for the fork to become ready.</p>
-     * 
+     *
      * <p><strong>Precondition:</strong> The fork must not already exist. Call
      * {@link #forkExists()} first to check, or use {@link #ensureForkExists()} to handle
      * both cases automatically.</p>
@@ -159,7 +198,7 @@ public class GitHubForkService
 
     /**
      * Polls {@link #forkExists()} repeatedly until the fork becomes available or a timeout occurs.
-     * 
+     *
      * <p><strong>Threading:</strong> This method <em>blocks</em> the calling thread by sleeping
      * between polling attempts. It must <em>never</em> be called from the Event Dispatch Thread (EDT).
      * Call this method from a background thread, such as a {@link javax.swing.SwingWorker}, to avoid

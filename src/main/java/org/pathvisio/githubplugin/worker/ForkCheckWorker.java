@@ -94,6 +94,10 @@ public class ForkCheckWorker extends SwingWorker<Void, String>
             {
                 callback.onConflict();
             }
+            else if (cause instanceof GitHubForkService.ForkParentMismatchException)
+            {
+                callback.onFailure(cause.getMessage());
+            }
             else if (cause != null)
             {
                 callback.onFailure(cause.getMessage());
