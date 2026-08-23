@@ -53,6 +53,7 @@ public class GitHubForkSyncService
 
     private final String accessToken;
     private final String authenticatedUsername;
+    private final String upstreamOwner;
     private final String upstreamRepo;
 
     /**
@@ -63,10 +64,11 @@ public class GitHubForkSyncService
      *                              i.e. the owner of the fork to be synced
      * @param upstreamRepo          the name of the forked repository (e.g., "sandbox-wp-db")
      */
-    public GitHubForkSyncService(String accessToken, String authenticatedUsername, String upstreamRepo)
+    public GitHubForkSyncService(String accessToken, String authenticatedUsername, String upstreamOwner, String upstreamRepo)
     {
         this.accessToken = accessToken;
         this.authenticatedUsername = authenticatedUsername;
+        this.upstreamOwner = upstreamOwner;
         this.upstreamRepo = upstreamRepo;
     }
 
@@ -83,6 +85,28 @@ public class GitHubForkSyncService
 
         /** The fork's main branch has diverged and cannot be auto-synced; manual resolution is required. */
         CONFLICT
+    }
+    private String fetchUpstreamDefaultBranch() throws IOException
+    {
+        String endpoint = API_BASE + "/repos/" + upstreamOwner + "/" + upstreamRepo;
+        HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "GET", accessToken);
+        int status = connection.getResponseCode();
+
+        if (status != 200)
+        {
+            connection.disconnect();
+            throw new IOException("Unexpected status while fetching upstream repository details: " + status);
+        }
+
+        String body = HttpUtil.readResponseBody(connection);
+        connection.disconnect();
+
+        String defaultBranch = JsonParser.extractValue(body, "default_branch");
+        if (defaultBranch == null)
+        {
+            throw new IOException("Could not determine the upstream repository's default branch.");
+        }
+        return defaultBranch;
     }
 
     /**
@@ -112,12 +136,13 @@ public class GitHubForkSyncService
      */
     public SyncResult syncWithUpstreamMain() throws IOException
     {
+        String branch = fetchUpstreamDefaultBranch();
         String endpoint = API_BASE + "/repos/" + authenticatedUsername + "/" + upstreamRepo + "/merge-upstream";
         HttpURLConnection connection = HttpUtil.openAuthenticatedConnection(endpoint, "POST", accessToken);
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
+        String requestBody = "{\"branch\":\"" + branch + "\"}";
 
-        String requestBody = "{\"branch\":\"main\"}";
         try (OutputStream os = connection.getOutputStream())
         {
             os.write(requestBody.getBytes(StandardCharsets.UTF_8));
@@ -128,7 +153,7 @@ public class GitHubForkSyncService
         {
             if (status == 200)
             {
-                // Read the response body to determine what kind of merge (if any) happened.
+                // Read the response body to determine what kind of merge happened if any did.
                 StringBuilder response = new StringBuilder();
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)))

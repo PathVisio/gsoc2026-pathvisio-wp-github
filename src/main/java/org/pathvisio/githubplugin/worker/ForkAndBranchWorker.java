@@ -52,7 +52,7 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
     protected String doInBackground() throws Exception 
     {
         GitHubForkService forkService = new GitHubForkService(accessToken, authenticatedUsername,upstreamOwner, upstreamRepo);
-        GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamRepo);
+        GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamOwner, upstreamRepo);
         GitHubBranchService branchService = new GitHubBranchService(accessToken, authenticatedUsername, upstreamRepo);
 
         String resultBranchName;
@@ -105,9 +105,9 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
         return resultBranchName;
     }
     @Override
-    protected void process(List<String> chunks) 
+    protected void process(List<String> chunks)
     {
-        for (String statusMessage : chunks) 
+        for (String statusMessage : chunks)
         {
             callback.onStatusUpdate(statusMessage);
         }
@@ -147,7 +147,7 @@ public class ForkAndBranchWorker extends SwingWorker<String, String>
         }
     }
 
-     /**
+    /**
      * Callback contract for ForkAndBranchWorker. All methods fire on the EDT,
      * same contract as GitHubAuthService.AuthCallback.
      */

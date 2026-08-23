@@ -40,7 +40,7 @@ public class ForkCheckWorker extends SwingWorker<Void, String>
     protected Void doInBackground() throws Exception
     {
         GitHubForkService forkService = new GitHubForkService(accessToken, authenticatedUsername, upstreamOwner, upstreamRepo);
-        GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamRepo);
+        GitHubForkSyncService syncService = new GitHubForkSyncService(accessToken, authenticatedUsername, upstreamOwner, upstreamRepo);
 
         publish("Checking fork...");
         boolean forkReady = forkService.ensureForkExists();
