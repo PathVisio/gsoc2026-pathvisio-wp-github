@@ -73,7 +73,7 @@ This is not a limitation of the finished plugin. As described earlier, the targe
 
 **Pull requests not appearing on pathway portal's dashboard.** Investigation traced this to an architectural boundary rather than a bug, the portal's dashboard reads exclusively from its own internal database, which is only populated when a submission goes through the portal's own web-based submission flow. A pull request opened directly via the GitHub API, which is how this plugin submits, thus it has no path into that database regardless of which repository or account it targets. This is now understood and root-caused, not an open question.
 
-**`ForkAndBranchWorker.java`.** Both submission dialogs have been migrated to the newer fork-check and branch-reuse workers, and this class is now unreferenced anywhere in the plugin or its CLI tools. It has not yet been deleted, since the question of whether it's safe to remove was already raised with the mentors; deletion is planned as a final cleanup step once that's confirmed.
+**ForkAndBranchWorker.java .** Both submission dialogs have been migrated to the newer fork-check and branch-reuse workers, and this class is now unreferenced anywhere in the plugin or its CLI tools. It has not yet been deleted, since the question of whether it's safe to remove was already raised with the mentors; deletion is planned as a final cleanup step once that's confirmed.
 
 ## Challenges and What I Learned
 
@@ -178,4 +178,3 @@ To switch between upstream repositories with colliding names, resolve the confli
 2. Either delete that repository (Settings → Danger Zone → Delete this repository), or rename it (Settings → Repository name) to free up the name.
 3. Point the plugin's Preferences URL at the new upstream and reopen the submission dialog — it will create a fresh fork under the now-available name.
 This does not affect the common case of switching between upstream repositories with distinct names, which works without any manual cleanup.
- 
