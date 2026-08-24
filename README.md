@@ -1,6 +1,6 @@
 # Direct Integration of PathVisio with WikiPathways GitHub
 
-**Google Summer of Code 2026 — Final Work Submission**
+**Google Summer of Code 2026: Final Work Submission**
 
 A PathVisio plugin that lets biologists perform Git operations like fork, branch, commit, and open pull requests for GPML pathway files directly from PathVisio's desktop interface without needing to leave the tool.
 

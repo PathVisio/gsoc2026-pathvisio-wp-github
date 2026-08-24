@@ -165,7 +165,7 @@ public class PluginController
      *
      * @return the access token, or {@code null} if not yet authenticated
      */
-    public String getAccessToken() 
+    public String getAccessToken()
     {
         return accessToken;
     }
