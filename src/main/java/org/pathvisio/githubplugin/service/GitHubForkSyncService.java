@@ -21,6 +21,7 @@ import org.pathvisio.githubplugin.util.JsonParser;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
@@ -108,6 +109,31 @@ public class GitHubForkSyncService
         }
         return defaultBranch;
     }
+    /**
+     * Reads the error body from the given HTTP connection.
+     *
+     * @param connection the HTTP connection
+     * @return the error body as a string
+     * @throws IOException if an I/O error occurs while reading the error stream
+     */
+    private String readErrorBody(HttpURLConnection connection) throws IOException
+    {
+        StringBuilder body = new StringBuilder();
+        InputStream errorStream = connection.getErrorStream();
+        if (errorStream != null)
+        {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(errorStream, StandardCharsets.UTF_8)))
+            {
+                String line;
+                while ((line = reader.readLine()) != null)
+                {
+                    body.append(line);
+                }
+            }
+        }
+        return body.toString();
+    }
 
     /**
      * Syncs the authenticated user's fork {@code main} branch with the upstream repository's
@@ -176,7 +202,21 @@ public class GitHubForkSyncService
             {
                 return SyncResult.CONFLICT;
             }
-            throw new IOException("Unexpected status while syncing fork with upstream: " + status);
+        String errorBody = readErrorBody(connection);
+        String message = "Unexpected status while syncing fork with upstream: " + status;
+        if (!errorBody.isEmpty())
+        {
+            String reason = JsonParser.extractValue(errorBody, "message");
+            if (reason != null)
+            {
+                message += " - " + reason;
+            }
+            else
+            {
+                message += " - " + errorBody;
+            }
+        }
+        throw new IOException(message);
         }
         finally
         {
